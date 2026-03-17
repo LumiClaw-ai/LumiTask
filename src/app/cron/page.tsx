@@ -2,19 +2,20 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Play, Pause, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Play, Pause, Trash2, ChevronDown, ChevronUp, Clock, Timer } from 'lucide-react'
 import { fetchCronJobs, fetchCronRuns, fetchAgents, createCronJob, updateCronJob, deleteCronJob, runCronJob, type CronJob } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
+import { timeAgo } from '@/lib/utils'
 
-const dowNames: Record<string, string> = { '0': '日', '1': '一', '2': '二', '3': '三', '4': '四', '5': '五', '6': '六' }
+const dowNames: Record<string, string> = { '0': '周日', '1': '周一', '2': '周二', '3': '周三', '4': '周四', '5': '周五', '6': '周六' }
 
 function cronToHuman(cron: string): string {
   if (!cron) return ''
   const parts = cron.split(' ')
   if (parts.length < 5) return cron
   const [min, hour, , , dow] = parts
-  if (dow !== '*' && hour !== '*') return `每周${dowNames[dow] || dow} ${hour}:${min.padStart(2, '0')}`
+  if (dow !== '*' && hour !== '*') return `每${dowNames[dow] || dow} ${hour}:${min.padStart(2, '0')}`
   if (hour !== '*' && min !== '*') return `每天 ${hour}:${min.padStart(2, '0')}`
   if (min.startsWith('*/')) return `每 ${min.slice(2)} 分钟`
   return cron
@@ -43,39 +44,39 @@ function CreateCronDialog({ open, onClose }: { open: boolean; onClose: () => voi
   if (!open) return null
 
   const inputClass = 'w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
-  const labelClass = 'block text-sm font-medium text-zinc-300 mb-1'
+  const labelClass = 'block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5'
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/60" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-lg p-6 space-y-4">
+        <div className="w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl p-6 space-y-5 shadow-2xl">
           <h3 className="text-lg font-semibold text-zinc-100">新建定时任务</h3>
           <div>
-            <label className={labelClass}>Message</label>
-            <textarea className={`${inputClass} min-h-[80px]`} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="任务消息..." />
+            <label className={labelClass}>任务内容</label>
+            <textarea className={`${inputClass} min-h-[80px] resize-none`} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="任务描述..." />
           </div>
           <div>
-            <label className={labelClass}>Cron Expression</label>
+            <label className={labelClass}>Cron 表达式</label>
             <input className={inputClass} value={cron} onChange={(e) => setCron(e.target.value)} placeholder="0 9 * * 1-5" />
-            <p className="text-xs text-zinc-500 mt-1">格式: 分 时 日 月 周 (例: 0 9 * * 1-5 = 工作日9点)</p>
-            {cron && <p className="text-xs text-blue-400 mt-1">{cronToHuman(cron)}</p>}
+            <p className="text-xs text-zinc-600 mt-1.5">格式：分 时 日 月 周（如 0 9 * * 1-5 = 工作日 9:00）</p>
+            {cron && <p className="text-xs text-blue-400 mt-1 font-medium">{cronToHuman(cron)}</p>}
           </div>
           <div>
-            <label className={labelClass}>Agent</label>
+            <label className={labelClass}>智能体</label>
             <select className={inputClass} value={agent} onChange={(e) => setAgent(e.target.value)}>
-              <option value="">Auto</option>
+              <option value="">自动</option>
               {agents.map((a) => <option key={a.id} value={a.id}>{a.displayName || a.name}</option>)}
             </select>
           </div>
           <div>
-            <label className={labelClass}>Description (optional)</label>
+            <label className={labelClass}>描述（可选）</label>
             <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="描述..." />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>取消</Button>
             <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !message.trim() || !cron.trim()}>
-              {mutation.isPending ? '创建中...' : '创建'}
+              {mutation.isPending ? '创建中...' : '新建'}
             </Button>
           </div>
         </div>
@@ -90,18 +91,17 @@ function RunHistory({ jobId }: { jobId: string }) {
     queryFn: () => fetchCronRuns(jobId),
   })
 
-  if (isLoading) return <p className="text-xs text-zinc-500 py-2 px-4">加载中...</p>
-  if (runs.length === 0) return <p className="text-xs text-zinc-500 py-2 px-4">暂无运行记录</p>
+  if (isLoading) return <p className="text-xs text-zinc-500 py-3 px-4">加载中...</p>
+  if (runs.length === 0) return <p className="text-xs text-zinc-500 py-3 px-4">暂无执行记录</p>
 
   return (
-    <div className="space-y-1 py-2 px-4">
+    <div className="space-y-1 py-3 px-4">
+      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">执行历史</p>
       {runs.slice(0, 10).map((r: any, i: number) => (
-        <div key={r.id || i} className="flex items-center gap-2 text-xs text-zinc-400">
-          <span className={r.status === 'done' ? 'text-green-400' : r.status === 'failed' ? 'text-red-400' : 'text-zinc-500'}>
-            {r.status === 'done' ? '✓' : r.status === 'failed' ? '✗' : '●'}
-          </span>
-          <span className="flex-1 truncate">{r.title || r.message || `Run #${i + 1}`}</span>
-          <span>{r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</span>
+        <div key={r.id || i} className="flex items-center gap-2 text-xs text-zinc-400 activity-row-enter">
+          <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${r.status === 'done' ? 'bg-green-500' : r.status === 'failed' ? 'bg-red-500' : 'bg-zinc-500'}`} />
+          <span className="flex-1 truncate">{r.title || r.message || `执行 #${i + 1}`}</span>
+          <span className="text-zinc-600">{r.createdAt ? timeAgo(r.createdAt) : ''}</span>
         </div>
       ))}
     </div>
@@ -134,66 +134,111 @@ export default function CronPage() {
     onError: (err: Error) => addToast({ type: 'error', title: '删除失败', message: err.message }),
   })
 
+  const enabledJobs = jobs.filter((j: CronJob) => j.enabled)
+  const disabledJobs = jobs.filter((j: CronJob) => !j.enabled)
+
+  const renderJob = (job: CronJob) => (
+    <div key={job.id} className={`rounded-lg bg-zinc-900/50 border border-zinc-800 overflow-hidden border-l-2 ${job.enabled ? 'border-l-green-500/60' : 'border-l-zinc-600/60'} hover:border-zinc-700 transition-colors activity-row-enter`}>
+      <div className="flex items-start gap-3 px-4 py-3">
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+        >
+          <p className="text-sm text-zinc-100 font-medium truncate">{job.name || job.message || job.description || '(未命名)'}</p>
+          {job.message && job.name && (
+            <p className="text-xs text-zinc-500 truncate mt-0.5">{job.message}</p>
+          )}
+          {/* Human-readable schedule - prominent */}
+          {job.cron && (
+            <p className="text-sm text-blue-400 font-medium mt-1.5">{cronToHuman(job.cron)}</p>
+          )}
+          <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-600 flex-wrap">
+            {job.agent && <span>智能体: {job.agent}</span>}
+            {job.cron && <span className="font-mono text-zinc-600">{job.cron}</span>}
+            {job.every && <span>频率: {job.every}</span>}
+          </div>
+          <div className="flex items-center gap-4 mt-1.5 text-xs text-zinc-600">
+            {job.nextRunAt && (
+              <span className="flex items-center gap-1">
+                <Timer className="h-3 w-3" /> 下次: {timeAgo(new Date(job.nextRunAt).getTime())}
+              </span>
+            )}
+            {job.lastRunAt && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" /> 上次: {timeAgo(new Date(job.lastRunAt).getTime())}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button
+            className={`p-1.5 rounded-md transition-colors ${job.enabled ? 'text-green-400 hover:text-yellow-400 hover:bg-zinc-800' : 'text-zinc-500 hover:text-green-400 hover:bg-zinc-800'}`}
+            onClick={() => toggleMutation.mutate({ id: job.id, enabled: !job.enabled })}
+            title={job.enabled ? '暂停' : '启用'}
+          >
+            <Pause className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+            onClick={() => runMutation.mutate(job.id)}
+            title="立即执行"
+          >
+            <Play className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+            onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+            title="历史"
+          >
+            {expandedJob === job.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            className="p-1.5 rounded-md text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-colors"
+            onClick={() => delMutation.mutate(job.id)}
+            title="删除"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      {expandedJob === job.id && (
+        <div className="border-t border-zinc-800 bg-zinc-950/50">
+          <RunHistory jobId={job.id} />
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 pl-12 lg:pl-6 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-100">定时任务</h2>
         <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4" /> 新建
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">新建</span>
         </Button>
       </div>
 
       {jobs.length === 0 ? (
-        <div className="text-center py-12 text-zinc-500">
-          <p className="text-4xl mb-2">🔄</p>
-          <p>暂无定时任务</p>
+        <div className="text-center py-16 text-zinc-500">
+          <Clock className="h-10 w-10 mx-auto mb-3 text-zinc-600" />
+          <p className="text-sm font-medium text-zinc-400">暂无定时任务</p>
+          <p className="text-xs mt-1">创建定时任务来自动化执行</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {jobs.map((job: CronJob) => (
-            <div key={job.id} className="rounded-lg bg-zinc-900 border border-zinc-800 overflow-hidden">
-              <div className="flex items-start gap-3 px-4 py-3">
-                <span className={`mt-1.5 h-2.5 w-2.5 rounded-full flex-shrink-0 ${job.enabled ? 'bg-green-400' : 'bg-zinc-600'}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-100 font-medium truncate">{job.name || job.message || job.description || '(unnamed)'}</p>
-                  {job.message && job.name && (
-                    <p className="text-xs text-zinc-500 truncate mt-0.5">{job.message}</p>
-                  )}
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500 flex-wrap">
-                    {job.agent && <span>Agent: {job.agent}</span>}
-                    {job.cron && (
-                      <>
-                        <span className="font-mono">{job.cron}</span>
-                        <span className="text-blue-400">{cronToHuman(job.cron)}</span>
-                      </>
-                    )}
-                    {job.every && <span>Every: {job.every}</span>}
-                    {job.nextRunAt && <span>Next: {new Date(job.nextRunAt).toLocaleString()}</span>}
-                    {job.lastRunAt && <span>Last: {new Date(job.lastRunAt).toLocaleString()}</span>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button size="sm" variant="ghost" onClick={() => toggleMutation.mutate({ id: job.id, enabled: !job.enabled })} title={job.enabled ? '暂停' : '启用'}>
-                    <Pause className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => runMutation.mutate(job.id)} title="立即执行">
-                    <Play className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)} title="历史">
-                    {expandedJob === job.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => delMutation.mutate(job.id)} title="删除">
-                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                  </Button>
-                </div>
-              </div>
-              {expandedJob === job.id && (
-                <div className="border-t border-zinc-800 bg-zinc-950">
-                  <RunHistory jobId={job.id} />
-                </div>
-              )}
+        <div className="space-y-6">
+          {enabledJobs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">运行中 ({enabledJobs.length})</p>
+              {enabledJobs.map(renderJob)}
             </div>
-          ))}
+          )}
+          {disabledJobs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">已暂停 ({disabledJobs.length})</p>
+              {disabledJobs.map(renderJob)}
+            </div>
+          )}
         </div>
       )}
 

@@ -45,6 +45,13 @@ export class OpenClawAdapter implements AgentAdapter {
       this.runningProcesses.set(context.taskId, proc)
       let stdout = ''
       let stderr = ''
+      let elapsedSec = 0
+
+      // Heartbeat: show elapsed time so user knows it's alive
+      const heartbeat = setInterval(() => {
+        elapsedSec += 5
+        onEvent({ type: 'progress', message: `执行中... ${elapsedSec}s`, timestamp: Date.now() })
+      }, 5000)
 
       proc.stdout.on('data', (chunk: Buffer) => {
         const text = chunk.toString()
@@ -67,6 +74,7 @@ export class OpenClawAdapter implements AgentAdapter {
       })
 
       proc.on('close', (code) => {
+        clearInterval(heartbeat)
         this.runningProcesses.delete(context.taskId)
 
         // Strip ANSI codes and parse JSON output

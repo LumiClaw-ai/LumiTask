@@ -57,7 +57,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <div className="px-6 py-6 space-y-6 max-w-2xl pl-12 lg:pl-6">
+      <div className="px-6 py-6 space-y-6 max-w-2xl pl-12 lg:pl-6 overflow-y-auto h-full">
         <h2 className="text-lg font-semibold">Settings</h2>
 
         <div className="space-y-5">

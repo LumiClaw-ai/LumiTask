@@ -8,12 +8,12 @@ import { Menu, X } from 'lucide-react'
 import { fetchInbox } from '@/lib/api'
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: '📊' },
-  { href: '/tasks', label: 'Tasks', icon: '📋' },
-  { href: '/inbox', label: 'Inbox', icon: '📥', showCount: true },
+  { href: '/', label: '概览', icon: '📊' },
+  { href: '/tasks', label: '任务', icon: '📋' },
+  { href: '/inbox', label: '收集箱', icon: '📥', showCount: true },
   { href: '/cron', label: '定时任务', icon: '🔄' },
-  { href: '/agents', label: 'Agents', icon: '🤖' },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/agents', label: '智能体', icon: '🤖' },
+  { href: '/settings', label: '设置', icon: '⚙️' },
 ]
 
 function InboxBadge({ count }: { count: number }) {

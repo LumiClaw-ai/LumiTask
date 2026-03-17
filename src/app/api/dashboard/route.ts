@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { tasks, agents } from "@/lib/db/schema";
 import { sql, eq, desc, inArray } from "drizzle-orm";
+import { getActiveSessions, getAgentLiveStatuses } from "@/lib/session-observer";
 
 export async function GET() {
   try {
@@ -41,6 +42,14 @@ export async function GET() {
       sql`SELECT COALESCE(SUM(total_input_tokens + total_output_tokens), 0) as totalTokens, COALESCE(SUM(total_cost_cents), 0) as totalCost FROM tasks`
     );
 
+    // Session observer data
+    let activeSessions: ReturnType<typeof getActiveSessions> = [];
+    let agentStatuses: ReturnType<typeof getAgentLiveStatuses> = [];
+    try {
+      activeSessions = getActiveSessions();
+      agentStatuses = getAgentLiveStatuses();
+    } catch {}
+
     return NextResponse.json({
       stats,
       recentTasks: enrichedRecent,
@@ -48,6 +57,8 @@ export async function GET() {
         totalTokens: usageResult?.totalTokens ?? 0,
         totalCost: usageResult?.totalCost ?? 0,
       },
+      activeSessions,
+      agentStatuses,
     });
   } catch (error) {
     console.error("Dashboard error:", error);

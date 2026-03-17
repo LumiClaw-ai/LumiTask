@@ -15,17 +15,17 @@ import { LogsList } from './logs-list'
 
 function formatDate(ts?: number | null) {
   if (!ts) return '-'
-  return new Date(ts).toLocaleString('en-US', {
+  return new Date(ts).toLocaleString('zh-CN', {
     month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
 }
 
 const scheduleLabels: Record<string, string> = {
-  manual: 'Manual',
-  immediate: '\u26A1 Immediate',
-  scheduled: '\u{1F550} Scheduled',
-  recurring: '\u{1F504} Recurring',
+  manual: '手动',
+  immediate: '\u26A1 立即执行',
+  scheduled: '\u{1F550} 定时',
+  recurring: '\u{1F504} 循环',
 }
 
 interface TaskDrawerProps {
@@ -34,6 +34,10 @@ interface TaskDrawerProps {
 }
 
 type Tab = 'comments' | 'logs'
+
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-zinc-800 ${className || ''}`} />
+}
 
 export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
   const [resultExpanded, setResultExpanded] = useState(false)
@@ -46,7 +50,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
     enabled: !!taskId,
     refetchInterval: (query) => {
       const t = query.state.data
-      return t?.status === 'running' ? 2000 : false
+      return t?.status === 'running' ? 5000 : false
     },
   })
 
@@ -98,15 +102,19 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
 
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl flex flex-col bg-zinc-950 border-l border-zinc-800 shadow-2xl animate-in slide-in-from-right duration-200">
         {isLoading ? (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-            <span className="text-sm text-zinc-500">Loading...</span>
-            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-100 transition-colors cursor-pointer">
-              <X className="h-5 w-5" />
-            </button>
+          <div className="px-5 py-4 border-b border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-5 w-48" />
+              <button onClick={onClose} className="text-zinc-500 hover:text-zinc-100 transition-colors cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-20 w-full" />
           </div>
         ) : !task ? (
           <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-            <span className="text-sm text-zinc-500">Task not found</span>
+            <span className="text-sm text-zinc-500">未找到任务</span>
             <button onClick={onClose} className="text-zinc-500 hover:text-zinc-100 transition-colors cursor-pointer">
               <X className="h-5 w-5" />
             </button>
@@ -134,12 +142,12 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                 )}
                 {task.assigneeAgentId && (
                   <span className="text-xs text-zinc-400">
-                    Agent: {task.agent ? (task.agent.displayName || task.agent.name) : task.assigneeAgentId}
+                    智能体: {task.agent ? (task.agent.displayName || task.agent.name) : task.assigneeAgentId}
                   </span>
                 )}
                 {((task.totalInputTokens || 0) + (task.totalOutputTokens || 0)) > 0 && (
                   <span className="text-xs text-zinc-500 ml-auto">
-                    {formatTokens(task.totalInputTokens || 0)} in / {formatTokens(task.totalOutputTokens || 0)} out
+                    {formatTokens(task.totalInputTokens || 0)} 输入 / {formatTokens(task.totalOutputTokens || 0)} 输出
                     {task.totalCostCents ? ` (~${formatCost(task.totalCostCents)})` : ''}
                   </span>
                 )}
@@ -157,14 +165,14 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
 
               {/* Info summary */}
               <div className="px-5 pb-3 flex gap-4 text-xs text-zinc-500">
-                <span>Created {formatDate(task.createdAt)}</span>
-                {task.startedAt && <span>Started {formatDate(task.startedAt)}</span>}
-                {task.completedAt && <span>Completed {formatDate(task.completedAt)}</span>}
+                <span>创建于 {formatDate(task.createdAt)}</span>
+                {task.startedAt && <span>开始于 {formatDate(task.startedAt)}</span>}
+                {task.completedAt && <span>完成于 {formatDate(task.completedAt)}</span>}
               </div>
 
               {task.description && (
                 <div className="mx-5 mb-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-                  <h3 className="text-xs font-medium text-zinc-400 mb-1.5">Description</h3>
+                  <h3 className="text-xs font-medium text-zinc-400 mb-1.5">描述</h3>
                   <p className="text-sm text-zinc-300 whitespace-pre-wrap">{task.description}</p>
                 </div>
               )}
@@ -172,7 +180,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
               {(task.summary || task.result) && (
                 <div className="mx-5 mb-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-medium text-zinc-400">Result</h3>
+                    <h3 className="text-xs font-medium text-zinc-400">执行结果</h3>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(task.result || task.summary || '')
@@ -180,7 +188,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                         setTimeout(() => setCopied(false), 2000)
                       }}
                       className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-1 rounded hover:bg-zinc-800 transition-colors"
-                      title="Copy"
+                      title="复制"
                     >
                       {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
                     </button>
@@ -238,25 +246,25 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
 
               {task.blockReason && (
                 <div className="mx-5 mb-3 rounded-lg border border-red-900/50 bg-red-950/30 p-3">
-                  <h3 className="text-xs font-medium text-red-400 mb-1">Blocked</h3>
+                  <h3 className="text-xs font-medium text-red-400 mb-1">已阻塞</h3>
                   <p className="text-sm text-zinc-400">{task.blockReason}</p>
                 </div>
               )}
 
               {task.failReason && (
                 <div className="mx-5 mb-3 rounded-lg border border-red-900/50 bg-red-950/30 p-3">
-                  <h3 className="text-xs font-medium text-red-400 mb-1">Failure Reason</h3>
+                  <h3 className="text-xs font-medium text-red-400 mb-1">失败原因</h3>
                   <p className="text-sm text-zinc-400">{task.failReason}</p>
                 </div>
               )}
 
               {task.artifacts && task.artifacts.length > 0 && (
                 <div className="mx-5 mb-3 space-y-2">
-                  <h3 className="text-xs font-medium text-zinc-400">Artifacts</h3>
+                  <h3 className="text-xs font-medium text-zinc-400">产物</h3>
                   {task.artifacts.map((a) => (
                     <div key={a.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5 flex items-center gap-2">
                       <Badge variant="default">{a.type}</Badge>
-                      <span className="text-sm text-zinc-300 truncate">{a.name || 'Untitled'}</span>
+                      <span className="text-sm text-zinc-300 truncate">{a.name || '未命名'}</span>
                       <span className="text-xs text-zinc-600 ml-auto flex-shrink-0">{timeAgo(a.createdAt)}</span>
                     </div>
                   ))}
@@ -273,7 +281,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                       : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'
                   }`}
                 >
-                  💬 Comments {comments.length > 0 && `(${comments.length})`}
+                  评论 {comments.length > 0 && `(${comments.length})`}
                 </button>
                 <button
                   onClick={() => setActiveTab('logs')}
@@ -283,7 +291,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                       : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'
                   }`}
                 >
-                  📋 Logs {logs.length > 0 && `(${logs.length})`}
+                  日志 {logs.length > 0 && `(${logs.length})`}
                 </button>
               </div>
             </div>

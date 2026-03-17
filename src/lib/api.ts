@@ -212,15 +212,57 @@ export async function browseFolders(dir?: string): Promise<{ current: string; pa
   return request(`/files/browse${qs ? `?${qs}` : ''}`)
 }
 
+// Session Observer types
+export interface SessionMessage {
+  id: string
+  timestamp: string
+  role: string
+  text?: string
+  thinking?: string
+  toolCalls?: { name: string; input: string }[]
+  toolResult?: { name: string; content: string }
+}
+
+export interface ActiveSession {
+  key: string
+  sessionId: string
+  agentId: string
+  agentName?: string
+  state: 'active' | 'idle'
+  updatedAt: number
+  latestMessages: SessionMessage[]
+  lastUserMessage?: string
+}
+
+export interface AgentLiveStatus {
+  agentId: string
+  state: 'idle' | 'busy'
+  currentSession?: string
+  lastActivity: number
+}
+
 // Dashboard
 export interface DashboardData {
   stats: { total: number; running: number; blocked: number; inbox: number; done: number }
   recentTasks: Task[]
   usage: { totalTokens: number; totalCost: number }
+  activeSessions?: ActiveSession[]
+  agentStatuses?: AgentLiveStatus[]
 }
 
 export async function fetchDashboard(): Promise<DashboardData> {
   return request<DashboardData>('/dashboard')
+}
+
+// Sessions
+export async function fetchActiveSessions(): Promise<{ activeSessions: ActiveSession[]; agentStatuses: AgentLiveStatus[] }> {
+  return request('/openclaw/sessions')
+}
+
+export async function fetchSessionTail(sessionId: string, agentId: string, lines?: number): Promise<SessionMessage[]> {
+  const params = new URLSearchParams({ agentId })
+  if (lines) params.set('lines', String(lines))
+  return request(`/openclaw/sessions/${sessionId}/tail?${params}`)
 }
 
 // Inbox

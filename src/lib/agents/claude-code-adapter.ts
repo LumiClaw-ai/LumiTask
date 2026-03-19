@@ -103,14 +103,30 @@ export class ClaudeCodeAdapter implements AgentAdapter {
         })
       }
 
+      // Heartbeat: show elapsed time if no stdout events for a while
+      let lastEventTime = Date.now()
+      let heartbeatSec = 0
+      const originalOnEvent = onEvent
+      onEvent = (e) => { lastEventTime = Date.now(); originalOnEvent(e) }
+      const heartbeat = setInterval(() => {
+        heartbeatSec += 10
+        if (Date.now() - lastEventTime > 8000) {
+          originalOnEvent({ type: 'progress', message: `等待响应中... ${heartbeatSec}s`, timestamp: Date.now() })
+        }
+      }, 10000)
+
       proc.on('close', (code) => {
+        clearInterval(heartbeat)
         this.runningProcesses.delete(context.taskId)
         // Process remaining buffer
         if (buffer.trim()) processLine(buffer.trim())
 
         const costCents = Math.round(totalCostUsd * 100)
 
-        if (code === 0 || resultText) {
+        // Check if result contains error patterns even with exit code 0
+        const isError = resultText && /^(API Error|Error:|UNKNOWN_|Unable to connect)/i.test(resultText.trim())
+
+        if ((code === 0 || resultText) && !isError) {
           resolve({
             success: true,
             summary: resultText.slice(0, 500) || 'Task completed',

@@ -167,6 +167,10 @@ export async function reopenTask(id: string) {
   return request<Task>(`/tasks/${id}/reopen`, { method: 'POST' })
 }
 
+export async function deleteTask(id: string) {
+  return request<void>(`/tasks/${id}`, { method: 'DELETE' })
+}
+
 export async function logTask(id: string, message: string) {
   return request<ActivityLogEntry>(`/tasks/${id}/log`, {
     method: 'POST',

@@ -154,7 +154,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
               </div>
 
               <div className="px-5 pb-2">
-                <TaskActions task={task} />
+                <TaskActions task={task} onDeleted={onClose} />
               </div>
             </div>
 

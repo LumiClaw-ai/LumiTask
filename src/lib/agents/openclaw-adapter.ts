@@ -47,8 +47,8 @@ export class OpenClawAdapter implements AgentAdapter {
       let stderr = ''
       let elapsedSec = 0
 
-      // Heartbeat + session tail: show elapsed time AND real progress from session file
-      let lastSeenMsgId = ''
+      // Heartbeat + session tail: read session JSONL for real progress
+      const seenMsgIds = new Set<string>()
       const heartbeat = setInterval(async () => {
         elapsedSec += 5
 
@@ -58,29 +58,31 @@ export class OpenClawAdapter implements AgentAdapter {
           const sessions = readAllSessions().filter(s => s.agentId === agentId)
           if (sessions.length > 0) {
             const latest = sessions.sort((a, b) => b.updatedAt - a.updatedAt)[0]
-            const msgs = readSessionTail(agentId, latest.sessionId, 3)
+            const msgs = readSessionTail(agentId, latest.sessionId, 5)
+            let hasNew = false
             for (const msg of msgs) {
-              if (msg.id && msg.id !== lastSeenMsgId) {
-                lastSeenMsgId = msg.id
-                if (msg.role === 'assistant' && msg.text) {
-                  const text = msg.text.replace(/^\[\[reply_to_current\]\]\s*/i, '').slice(0, 300)
-                  if (text) onEvent({ type: 'progress', message: text, timestamp: Date.now() })
-                }
-                if (msg.toolCalls) {
-                  for (const tc of msg.toolCalls) {
-                    onEvent({ type: 'tool_use', message: `🔧 ${tc.name}`, toolName: tc.name, toolInput: tc.input.slice(0, 200), timestamp: Date.now() })
-                  }
-                }
-                if (msg.toolResult) {
-                  onEvent({ type: 'tool_result', message: msg.toolResult.content.slice(0, 200), toolName: msg.toolResult.name, timestamp: Date.now() })
+              if (!msg.id || seenMsgIds.has(msg.id)) continue
+              seenMsgIds.add(msg.id)
+              hasNew = true
+
+              if (msg.role === 'assistant' && msg.text) {
+                const text = msg.text.replace(/^\[\[reply_to_current\]\]\s*/i, '').slice(0, 300)
+                if (text) onEvent({ type: 'progress', message: text, timestamp: Date.now() })
+              }
+              if (msg.toolCalls) {
+                for (const tc of msg.toolCalls) {
+                  onEvent({ type: 'tool_use', message: `🔧 ${tc.name}`, toolName: tc.name, toolInput: tc.input.slice(0, 200), timestamp: Date.now() })
                 }
               }
+              if (msg.role === 'toolResult' && msg.toolResult) {
+                onEvent({ type: 'tool_result', message: msg.toolResult.content.slice(0, 200), toolName: msg.toolResult.name, timestamp: Date.now() })
+              }
             }
-            return // Got real data, skip generic heartbeat
+            if (hasNew) return // Got new data, skip generic heartbeat
           }
         } catch {}
 
-        // Fallback: generic heartbeat
+        // Fallback: generic heartbeat only if no session data
         onEvent({ type: 'progress', message: `执行中... ${elapsedSec}s`, timestamp: Date.now() })
       }, 5000)
 

@@ -47,9 +47,40 @@ export class OpenClawAdapter implements AgentAdapter {
       let stderr = ''
       let elapsedSec = 0
 
-      // Heartbeat: show elapsed time so user knows it's alive
-      const heartbeat = setInterval(() => {
+      // Heartbeat + session tail: show elapsed time AND real progress from session file
+      let lastSeenMsgId = ''
+      const heartbeat = setInterval(async () => {
         elapsedSec += 5
+
+        // Try reading session file for real-time progress
+        try {
+          const { readSessionTail, readAllSessions } = await import('@/lib/session-observer')
+          const sessions = readAllSessions().filter(s => s.agentId === agentId)
+          if (sessions.length > 0) {
+            const latest = sessions.sort((a, b) => b.updatedAt - a.updatedAt)[0]
+            const msgs = readSessionTail(agentId, latest.sessionId, 3)
+            for (const msg of msgs) {
+              if (msg.id && msg.id !== lastSeenMsgId) {
+                lastSeenMsgId = msg.id
+                if (msg.role === 'assistant' && msg.text) {
+                  const text = msg.text.replace(/^\[\[reply_to_current\]\]\s*/i, '').slice(0, 300)
+                  if (text) onEvent({ type: 'progress', message: text, timestamp: Date.now() })
+                }
+                if (msg.toolCalls) {
+                  for (const tc of msg.toolCalls) {
+                    onEvent({ type: 'tool_use', message: `🔧 ${tc.name}`, toolName: tc.name, toolInput: tc.input.slice(0, 200), timestamp: Date.now() })
+                  }
+                }
+                if (msg.toolResult) {
+                  onEvent({ type: 'tool_result', message: msg.toolResult.content.slice(0, 200), toolName: msg.toolResult.name, timestamp: Date.now() })
+                }
+              }
+            }
+            return // Got real data, skip generic heartbeat
+          }
+        } catch {}
+
+        // Fallback: generic heartbeat
         onEvent({ type: 'progress', message: `执行中... ${elapsedSec}s`, timestamp: Date.now() })
       }, 5000)
 
@@ -82,31 +113,62 @@ export class OpenClawAdapter implements AgentAdapter {
         let resultText = ''
         let durationMs = 0
 
-        // Find JSON in stdout (may have non-JSON lines before it)
+        // Find JSON object in stdout using bracket matching (may have garbage after)
         const jsonStart = cleanStdout.indexOf('{')
         if (jsonStart >= 0) {
-          try {
-            const json = JSON.parse(cleanStdout.slice(jsonStart))
-            const payloads = json.payloads || []
-            resultText = payloads.map((p: any) => p.text || '').filter(Boolean).join('\n')
-            durationMs = json.meta?.durationMs || 0
-          } catch {
+          let depth = 0, jsonEnd = -1
+          for (let i = jsonStart; i < cleanStdout.length; i++) {
+            if (cleanStdout[i] === '{') depth++
+            else if (cleanStdout[i] === '}') { depth--; if (depth === 0) { jsonEnd = i; break } }
+          }
+          if (jsonEnd > 0) {
+            try {
+              const json = JSON.parse(cleanStdout.slice(jsonStart, jsonEnd + 1))
+              const payloads = json.payloads || []
+              resultText = payloads.map((p: any) => p.text || '').filter(Boolean).join('\n')
+              durationMs = json.meta?.durationMs || 0
+            } catch {
+              resultText = cleanStdout
+            }
+          } else {
             resultText = cleanStdout
           }
         } else {
           resultText = cleanStdout
         }
 
-        if (code === 0 && resultText) {
+        // exit code 0 = success, even if resultText is empty
+        const isSuccess = code === 0 || (code === null && resultText)
+
+        if (isSuccess) {
+          const summary = resultText || '任务已完成'
           onEvent({
             type: 'completed',
             message: `完成 | ${durationMs ? (durationMs / 1000).toFixed(1) + 's' : ''}`,
             timestamp: Date.now(),
           })
+
+          // Try to read session file for richer result if resultText is empty
+          if (!resultText) {
+            try {
+              const { readSessionTail, readAllSessions } = require('@/lib/session-observer')
+              const cfgAgentId = context.agentConfig ? JSON.parse(context.agentConfig).openclawAgentId || 'main' : 'main'
+              const sessions = readAllSessions().filter((s: any) => s.agentId === cfgAgentId)
+              if (sessions.length > 0) {
+                const latest = sessions.sort((a: any, b: any) => b.updatedAt - a.updatedAt)[0]
+                const msgs = readSessionTail(cfgAgentId, latest.sessionId, 5)
+                const lastAssistant = [...msgs].reverse().find((m: any) => m.role === 'assistant' && m.text)
+                if (lastAssistant?.text) {
+                  resultText = lastAssistant.text.replace(/^\[\[reply_to_current\]\]\s*/i, '')
+                }
+              }
+            } catch {}
+          }
+
           resolve({
             success: true,
-            summary: resultText.slice(0, 500),
-            result: resultText,
+            summary: (resultText || summary).slice(0, 500),
+            result: resultText || summary,
             totalInputTokens: 0,
             totalOutputTokens: 0,
           })

@@ -207,6 +207,58 @@ export class ClaudeCodeAdapter implements AgentAdapter {
       }
     }
 
+    // Tool results (comes as 'user' role with 'tool_result' content blocks)
+    if (event.type === 'user' && event.message?.content) {
+      for (const block of (Array.isArray(event.message.content) ? event.message.content : [])) {
+        if (block.type === 'tool_result') {
+          const resultText = typeof block.content === 'string'
+            ? block.content
+            : Array.isArray(block.content)
+              ? block.content.map((c: any) => c.text || '').join('')
+              : ''
+          if (resultText) {
+            onEvent({
+              type: 'tool_result',
+              message: resultText.slice(0, 300),
+              toolName: block.tool_use_id || '',
+              timestamp: Date.now(),
+            })
+          }
+        }
+      }
+      return
+    }
+
+    // Sub-agent events (Claude Code's Agent tool)
+    if (event.type === 'system' && event.subtype?.startsWith('task_')) {
+      if (event.subtype === 'task_started') {
+        onEvent({
+          type: 'tool_use',
+          message: `🤖 子任务启动: ${event.description || ''}`,
+          toolName: 'SubAgent',
+          toolInput: `type=${event.task_type || ''} id=${event.task_id || ''}`,
+          timestamp: Date.now(),
+        })
+      } else if (event.subtype === 'task_progress') {
+        onEvent({
+          type: 'tool_use',
+          message: `🤖 ${event.last_tool_name || ''}: ${(event.description || '').slice(0, 200)}`,
+          toolName: event.last_tool_name || 'SubAgent',
+          toolInput: `tokens=${event.usage?.total_tokens || 0}`,
+          timestamp: Date.now(),
+        })
+      } else if (event.subtype === 'task_notification') {
+        const dur = event.usage?.duration_ms ? `${(event.usage.duration_ms / 1000).toFixed(1)}s` : ''
+        onEvent({
+          type: 'progress',
+          message: `🤖 子任务${event.status === 'completed' ? '完成' : '失败'}: ${event.summary || ''} (${dur}, ${event.usage?.tool_uses || 0} tools)`,
+          inputTokens: event.usage?.total_tokens,
+          timestamp: Date.now(),
+        })
+      }
+      return
+    }
+
     // Result event
     if (event.type === 'result') {
       if (event.result) {

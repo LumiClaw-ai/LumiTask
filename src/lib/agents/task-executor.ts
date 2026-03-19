@@ -12,7 +12,12 @@ import type { ExecutionEvent, TaskContext } from './adapter'
 adapterManager.register(new ClaudeCodeAdapter())
 adapterManager.register(new OpenClawAdapter())
 
-export async function executeTask(taskId: string): Promise<void> {
+// Execute with a custom prompt override (used for follow-up instructions)
+export async function executeTaskWithPrompt(taskId: string, promptOverride: string): Promise<void> {
+  return executeTask(taskId, promptOverride)
+}
+
+export async function executeTask(taskId: string, promptOverride?: string): Promise<void> {
   // Get task and agent
   const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId))
   if (!task) throw new Error('Task not found')
@@ -51,12 +56,12 @@ export async function executeTask(taskId: string): Promise<void> {
 
   eventBus.broadcast('task.started', { taskId, number: task.number })
 
-  // Build context
+  // Build context — use promptOverride for follow-up executions
   const context: TaskContext = {
     taskId,
     taskNumber: task.number,
-    title: task.title,
-    description: task.description,
+    title: promptOverride ? task.title : task.title,
+    description: promptOverride || task.description,
     workingDirectory: task.workingDirectory,
     agentConfig: agent.adapterConfig,
   }

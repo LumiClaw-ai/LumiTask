@@ -75,17 +75,18 @@ export async function POST(
       }
     }
 
-    // 3. Build structured multi-turn prompt and re-execute
-    const originalDesc = task.description || ""
+    // 3. Re-execute with follow-up context (don't modify original description)
+    // Store the follow-up instruction in a separate field for the executor to use
     const previousResult = [task.summary, task.result].filter(Boolean).join("\n")
+    const followUpPrompt = `原始任务: ${task.title}\n${task.description || ""}\n\n上次执行结果:\n${previousResult || "(无)"}\n\n用户追加指令:\n${body.body}\n\n请根据用户的追加指令，在上次结果的基础上继续执行。`
 
-    const updatedDescription = `原始任务: ${task.title}\n${originalDesc}\n\n上次执行结果:\n${previousResult || "(无)"}\n\n用户追加指令:\n${body.body}\n\n请根据用户的追加指令，在上次结果的基础上继续执行。`
-
+    // Reset task for re-execution without changing title/description
     await db.update(tasks).set({
-      status: "running" as const,
-      description: updatedDescription,
+      status: "open" as const,
       blockReason: null,
+      failReason: null,
       completedAt: null,
+      startedAt: null,
       updatedAt: Date.now(),
     }).where(eq(tasks.id, id))
 
@@ -93,15 +94,18 @@ export async function POST(
       id: nanoid(),
       taskId: id,
       action: "task.reopened",
-      actorType: "system",
-      message: "Re-executing with user follow-up instruction",
+      actorType: "user",
+      message: `用户追加指令并继续执行: ${body.body.slice(0, 200)}`,
       createdAt: Date.now(),
     })
 
     eventBus.broadcast("task.updated", { taskId: id, number: task.number })
 
-    // Fire and forget re-execution
-    executeTask(id).catch(() => {})
+    // Execute with the follow-up prompt as override description
+    // We pass it via a temporary approach: update a transient field
+    // Better: pass directly to executeTask
+    const { executeTaskWithPrompt } = await import("@/lib/agents/task-executor")
+    executeTaskWithPrompt(id, followUpPrompt).catch(() => {})
 
     return NextResponse.json({ ok: true, fallback: true })
   } catch (error) {

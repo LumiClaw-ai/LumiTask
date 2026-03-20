@@ -1,41 +1,16 @@
-# OpenClaw + LumiTask Integration Guide
+# LumiTask — OpenClaw Agent 接入指南
 
-This guide shows how to connect your OpenClaw agents to LumiTask for task management.
+这份文档是给 OpenClaw Agent 阅读的。读完后你就知道如何帮用户管理任务了。
 
-## Overview
+## 你是谁，LumiTask 是什么
 
-```
-You (Feishu/Telegram/Discord)
-  ↓ "帮我创建一个任务"
-OpenClaw Agent
-  ↓ calls LumiTask API
-LumiTask (http://localhost:3179)
-  ↓ assigns & executes
-Agent runs the task → results back to LumiTask
-  ↓ notifies
-You (via Feishu/Telegram/Discord)
-```
+LumiTask 是用户本地运行的任务管理工具。用户通过 LumiTask 的看板界面查看和管理任务，你通过 API 帮用户创建、更新和执行任务。
 
-## Step 1: Start LumiTask
+LumiTask 已经在用户电脑上运行，API 地址是 `http://localhost:3179`。
 
-```bash
-git clone https://github.com/LumiClaw-ai/LumiTask.git
-cd LumiTask
-pnpm install
-pnpm dev
-```
+## 安装 Skill
 
-LumiTask runs at `http://localhost:3179`.
-
-## Step 2: Give Your Agent the LumiTask Skill
-
-Create a global skill file that teaches your OpenClaw agent how to use LumiTask:
-
-```bash
-mkdir -p ~/.openclaw/skills/lumitask
-```
-
-Create `~/.openclaw/skills/lumitask/SKILL.md`:
+请在 `~/.openclaw/skills/lumitask/` 目录下创建 `SKILL.md` 文件，内容如下：
 
 ```markdown
 ---
@@ -43,237 +18,117 @@ name: lumitask
 description: LumiTask 任务管理 — 创建、查询、更新、执行任务
 ---
 
-# LumiTask API
+# LumiTask 任务管理
 
-LumiTask 是你的任务管理中心，运行在 http://localhost:3179。
-你可以通过 REST API 管理任务。
+LumiTask 运行在 http://localhost:3179，通过 REST API 管理任务。
 
 ## 创建任务
 
-```bash
+当用户说"创建任务"、"记下来"、"帮我做"、"安排一下"等意图时，调用此 API。
+
+POST http://localhost:3179/api/tasks
+Content-Type: application/json
+
+必填：
+- title — 任务标题
+
+可选：
+- description — 任务描述
+- assigneeAgentId — 执行任务的 Agent ID
+- scheduleType — manual(默认) | immediate(立即执行) | scheduled | recurring
+- dependsOn — 前置任务 ID 数组，如 ["id-1", "id-2"]，前置任务全部完成后自动执行
+- inputContext — JSON 对象，传给执行 Agent 的结构化输入
+- parentTaskId — 父任务 ID（用于子任务拆解）
+- concurrencyKey — 并发控制 key，相同 key 的任务不会同时执行
+- maxRetries — 失败后最大重试次数
+- workingDirectory — Agent 执行时的工作目录
+- source — 来源标记：web | chat | cli
+
+示例：
 curl -X POST http://localhost:3179/api/tasks \
   -H "Content-Type: application/json" \
-  -d '{
-    "title": "任务标题",
-    "description": "任务描述",
-    "scheduleType": "manual"
-  }'
-```
-
-参数：
-- `title` (必填) — 任务标题
-- `description` — 任务描述
-- `assigneeAgentId` — 指定执行的 Agent ID
-- `scheduleType` — `manual`(默认) | `immediate`(立即执行) | `scheduled` | `recurring`
-- `dependsOn` — 前置任务 ID 数组，如 `["task-id-1", "task-id-2"]`
-- `inputContext` — 传给 Agent 的结构化输入（JSON 对象）
-- `concurrencyKey` — 并发控制 key（相同 key 的任务互斥执行）
-- `maxRetries` — 最大重试次数
-- `parentTaskId` — 父任务 ID（用于子任务）
-- `workingDirectory` — 工作目录
-- `source` — `web` | `chat` | `cli`
+  -d '{"title": "重构登录模块", "description": "迁移到新的 auth 中间件", "source": "chat"}'
 
 ## 查询任务
 
-```bash
-# 所有任务
-curl http://localhost:3179/api/tasks
-
-# 按状态
-curl http://localhost:3179/api/tasks?status=running
-
-# 单个任务详情（含日志、依赖、子任务）
-curl http://localhost:3179/api/tasks/{id}
-```
+GET http://localhost:3179/api/tasks                      — 所有任务
+GET http://localhost:3179/api/tasks?status=running        — 按状态筛选
+GET http://localhost:3179/api/tasks?parentTaskId={id}     — 查子任务
+GET http://localhost:3179/api/tasks/{id}                  — 单个任务详情（含日志、依赖、子任务）
 
 ## 更新任务
 
-```bash
-curl -X PATCH http://localhost:3179/api/tasks/{id} \
-  -H "Content-Type: application/json" \
-  -d '{"title": "新标题", "description": "新描述"}'
-```
+PATCH http://localhost:3179/api/tasks/{id}
+可更新字段：title, description, dependsOn, inputContext, concurrencyKey, maxRetries
 
 ## 执行任务
 
-```bash
-curl -X POST http://localhost:3179/api/tasks/{id}/execute
-```
+POST http://localhost:3179/api/tasks/{id}/execute
 
-## 完成/失败/阻塞任务
+## 状态操作
 
-```bash
-# 完成
-curl -X POST http://localhost:3179/api/tasks/{id}/complete
+POST http://localhost:3179/api/tasks/{id}/complete                          — 标记完成
+POST http://localhost:3179/api/tasks/{id}/fail    {"reason": "失败原因"}    — 标记失败
+POST http://localhost:3179/api/tasks/{id}/reopen                            — 重新打开
+POST http://localhost:3179/api/tasks/{id}/cancel                            — 取消
 
-# 失败
-curl -X POST http://localhost:3179/api/tasks/{id}/fail \
-  -H "Content-Type: application/json" \
-  -d '{"reason": "失败原因"}'
+## 请求用户决策（阻塞任务）
 
-# 阻塞（请求人类决策）
-curl -X POST http://localhost:3179/api/tasks/{id}/block \
-  -H "Content-Type: application/json" \
-  -d '{
-    "decision": {
-      "type": "choose",
-      "question": "选择部署环境",
-      "options": [
-        {"id": "staging", "label": "测试环境"},
-        {"id": "prod", "label": "生产环境"}
-      ]
-    }
-  }'
-```
+当你需要用户做选择时：
 
-## 创建子任务
+POST http://localhost:3179/api/tasks/{id}/block
+{"decision": {"type": "choose", "question": "选择部署环境", "options": [{"id": "staging", "label": "测试环境"}, {"id": "prod", "label": "生产环境"}]}}
 
-```bash
-curl -X POST http://localhost:3179/api/tasks/{id}/subtasks \
-  -H "Content-Type: application/json" \
-  -d '[
-    {"title": "步骤1: 分析需求", "sequential": true},
-    {"title": "步骤2: 编写代码", "sequential": true},
-    {"title": "步骤3: 运行测试", "sequential": true}
-  ]'
-```
+decision.type 可以是：
+- confirm — 是/否确认
+- choose — 从选项中选择
+- input — 自由输入
+- approve — 审批（批准/驳回）
 
-`sequential: true` 会自动设置依赖链，前一个完成后下一个才执行。
+用户在 LumiTask 界面上做出选择后，任务会自动继续。
 
 ## 回复阻塞的任务
 
-```bash
-curl -X POST http://localhost:3179/api/tasks/{id}/reply \
-  -H "Content-Type: application/json" \
-  -d '{"body": "选择测试环境"}'
-```
+POST http://localhost:3179/api/tasks/{id}/reply
+{"body": "用户的回复内容"}
 
-## 添加评论/日志
+## 创建子任务
 
-```bash
-curl -X POST http://localhost:3179/api/tasks/{id}/comments \
-  -H "Content-Type: application/json" \
-  -d '{"body": "进度更新：已完成 50%", "actorType": "agent"}'
-```
+把大任务拆成小步骤：
+
+POST http://localhost:3179/api/tasks/{id}/subtasks
+[
+  {"title": "步骤1: 分析需求", "sequential": true},
+  {"title": "步骤2: 编写代码", "sequential": true},
+  {"title": "步骤3: 测试验证", "sequential": true}
+]
+
+sequential: true 会自动设置依赖链——步骤1完成后才执行步骤2，以此类推。
+
+## 添加评论
+
+POST http://localhost:3179/api/tasks/{id}/comments
+{"body": "进度更新：已完成 50%", "actorType": "agent"}
 
 ## 查看 Agent 列表
 
-```bash
-curl http://localhost:3179/api/agents
-```
+GET http://localhost:3179/api/agents
 
 ## 使用建议
 
-- 当用户说"创建任务"、"记下来"、"帮我做"时，调用创建任务 API
-- 复杂任务先创建父任务，再用子任务 API 拆解
-- 需要用户决定时，用 block API 的 decision 字段
-- 任务完成后，把结果写入 complete 或 log 中
+1. 用户说"创建任务"→ POST /api/tasks
+2. 复杂任务 → 先创建父任务，再 POST /api/tasks/{id}/subtasks 拆解
+3. 需要用户拿主意 → POST /api/tasks/{id}/block 带 decision
+4. 完成工作后 → POST /api/tasks/{id}/complete 或添加评论记录结果
+5. 创建任务后告诉用户任务编号和查看链接：http://localhost:3179
 ```
 
-## Step 3: Register the Skill
+## 验证安装
 
-The skill will be auto-discovered if placed in `~/.openclaw/skills/lumitask/`.
+Skill 放到 `~/.openclaw/skills/lumitask/SKILL.md` 后会自动生效。
 
-To verify:
+测试一下——用户对你说"帮我创建一个任务"时，你应该调用 `POST http://localhost:3179/api/tasks` 来创建。
 
-```bash
-openclaw agents list --json
-# Your agent should now have lumitask in its available skills
-```
+## 端口说明
 
-## Step 4: Test It
-
-In Feishu / Telegram / Discord, talk to your agent:
-
-```
-你：帮我创建一个任务，标题是"重构用户登录模块"
-
-Agent：已创建任务 #12: 重构用户登录模块
-       状态: open
-       查看详情: http://localhost:3179/tasks/xxx
-```
-
-Open `http://localhost:3179` in your browser to see the task on the Kanban board.
-
-## Remote Connection
-
-If your OpenClaw runs on a remote server:
-
-### Option A: Connection Code (Recommended)
-
-On the remote server:
-```bash
-openclaw qr --setup-code-only
-# Outputs: eyJ1cmwiOiJ3czovLy4uLiIs...
-```
-
-In LumiTask Settings → Agent Connection → Remote Mode → paste the code → Connect.
-
-### Option B: Ask Your Agent
-
-```
-你：给我 LumiTask 连接码
-
-Agent：这是你的连接码：eyJ1cmwiOi...
-       把它粘贴到 LumiTask 设置页面即可
-```
-
-## Notification Setup
-
-LumiTask can send task notifications through your agent's existing channels (Feishu, Discord, etc).
-
-1. Go to Settings → Agent Channel Notifications
-2. Select an agent with a bound channel
-3. Choose which events to notify (completed, failed, blocked)
-4. Click "Test Send" to verify
-
-## CLI Reference
-
-If your agent prefers CLI over API:
-
-```bash
-# Set API URL (auto-discovered from ~/.lumitask/port if running)
-export LUMITASK_API_URL=http://localhost:3179/api
-
-# Task management
-lumitask create --title "Task name" --description "Details"
-lumitask create --title "Urgent fix" --schedule immediate --assign "claude-code"
-lumitask list
-lumitask show <task-id>
-lumitask start <task-id>
-lumitask complete <task-id>
-lumitask fail <task-id> --reason "Error message"
-lumitask block <task-id> --reason "Need human input"
-lumitask reopen <task-id>
-lumitask log <task-id> --message "Progress update"
-
-# Agent management
-lumitask agent list
-lumitask agent detect
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│  LumiTask (http://localhost:3179)               │
-│                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
-│  │  Web UI  │  │ REST API │  │   CLI    │      │
-│  │ (Kanban) │  │ /api/*   │  │ lumitask │      │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘      │
-│       │              │              │             │
-│  ┌────┴──────────────┴──────────────┴────┐      │
-│  │         Task Engine                    │      │
-│  │  Scheduler → Executor → Concurrency   │      │
-│  │  Dependencies → Retry → Notifications │      │
-│  └────┬─────────────────────────┬────────┘      │
-│       │                         │                │
-│  ┌────┴─────┐            ┌─────┴──────┐        │
-│  │ Claude   │            │  OpenClaw  │        │
-│  │ Code     │            │  Adapter   │        │
-│  │ Adapter  │            │ (local/    │        │
-│  │          │            │  remote)   │        │
-│  └──────────┘            └────────────┘        │
-└─────────────────────────────────────────────────┘
-```
+默认端口是 `3179`。如果用户的 LumiTask 运行在其他端口，端口信息会写在 `~/.lumitask/port` 文件中，你可以读取这个文件获得实际端口号。

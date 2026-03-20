@@ -25,6 +25,12 @@
 
 ### 1. 安装并启动
 
+**方式 A：下载桌面客户端（推荐）**
+
+前往 [Releases](https://github.com/LumiClaw-ai/LumiTask/releases) 下载 LumiTask 客户端，双击打开即可。
+
+**方式 B：从源码运行**
+
 ```bash
 git clone https://github.com/LumiClaw-ai/LumiTask.git
 cd LumiTask

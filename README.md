@@ -1,79 +1,216 @@
 # LumiTask
 
-轻量级、自托管的 AI Agent 任务管理与执行平台。
+Lightweight, self-hosted AI Agent task management platform.
 
-LumiTask 是一个为 AI 编程 Agent（如 Claude Code、OpenClaw）设计的任务调度中心，让你可以创建、分配、执行和监控 AI Agent 的工作任务，并通过实时流式输出观察执行过程。
+LumiTask is an open-source task orchestration center for AI coding agents (Claude Code, OpenClaw, and more). Create, assign, execute, and monitor agent tasks with real-time streaming, dependency chains, and multi-agent support.
 
-## 核心能力
+**Part of the [LumiClaw](https://lumiclaw.ai) ecosystem.**
 
-- **任务全生命周期管理** — 从收集想法（Inbox）到创建任务、分配 Agent、执行、完成，支持 `inbox → open → assigned → running → done/failed/blocked` 完整状态流转
-- **多 Agent 支持** — 可插拔的 Agent 适配器架构，内置 Claude Code 和 OpenClaw 适配器，支持自动检测已安装的 Agent
-- **定时与周期任务** — 支持一次性任务、立即执行、定时执行和 Cron 周期性自动执行
-- **实时流式执行** — 通过 SSE 实时推送 Agent 执行进度，包括工具调用、Token 消耗、输出内容
-- **看板视图** — Kanban 风格的任务面板，按状态分列展示，支持按 Agent 和日期筛选
-- **成本追踪** — 自动记录每个任务的 Token 用量和费用
-- **完整审计日志** — 不可变的活动日志，记录所有操作、工具调用和执行结果
-- **CLI 工具** — 命令行创建和管理任务，适合在终端工作流中使用
-- **浏览器通知** — 任务完成或失败时推送桌面通知
+## Features
 
-## 技术栈
+- **Task lifecycle** — `open → assigned → running → done/failed/blocked`, with Kanban board view
+- **Task dependencies** — Chain tasks with `dependsOn`, auto-execute when predecessors complete
+- **Subtask decomposition** — Break complex tasks into sequential/parallel subtasks
+- **Multi-agent** — Pluggable adapter architecture, built-in support for Claude Code and OpenClaw
+- **Real-time streaming** — SSE-based live execution progress, tool calls, token usage
+- **Structured I/O** — Pass structured `inputContext` between tasks, collect `outputResult`
+- **Decision system** — Agents can request human decisions (confirm/choose/input/approve)
+- **Notification channels** — Push to Feishu, Discord, Telegram via OpenClaw agent channels
+- **Remote agents** — Connect to OpenClaw Gateway on remote servers via connection code
+- **Scheduled & recurring** — One-time, cron-based, and immediate task execution
+- **Cost tracking** — Automatic token counting and cost calculation per task
+- **CLI tool** — Full task management from terminal
+- **Desktop app** — Electron app with system tray (macOS)
 
-| 层级 | 技术 |
-|------|------|
-| 前端 | Next.js 16 + React 19 + Tailwind CSS v4 + Radix UI |
-| 后端 | Next.js API Routes + SSE |
-| 数据库 | SQLite + Drizzle ORM |
-| 状态管理 | TanStack React Query v5 |
-| CLI | Commander.js + tsx |
-| 测试 | Vitest + Testing Library |
-
-## 快速开始
+## Quick Start
 
 ```bash
-# 安装依赖
+git clone https://github.com/LumiClaw-ai/LumiTask.git
+cd LumiTask
 pnpm install
-
-# 启动开发服务器
 pnpm dev
 
-# 访问 http://localhost:3000
+# Open http://localhost:3179
 ```
 
-### CLI 使用
+## CLI
 
 ```bash
-# 创建任务
-pnpm cli:dev create "重构登录模块" --desc "将登录逻辑迁移到新的 auth 中间件"
+# Create a task
+pnpm cli:dev create --title "Refactor auth module" --description "Migrate to new middleware"
 
-# 查看任务列表
+# Create with agent assignment
+pnpm cli:dev create --title "Fix login bug" --assign "claude-code"
+
+# Create with immediate execution
+pnpm cli:dev create --title "Run tests" --schedule immediate
+
+# List tasks
 pnpm cli:dev list
 
-# 启动任务执行
+# Show task details
+pnpm cli:dev show <task-id>
+
+# Start a task
 pnpm cli:dev start <task-id>
 
-# 查看任务详情
-pnpm cli:dev show <task-id>
+# Complete / fail / block / reopen
+pnpm cli:dev complete <task-id>
+pnpm cli:dev fail <task-id> --reason "Build failed"
+pnpm cli:dev block <task-id> --reason "Need API key"
+pnpm cli:dev reopen <task-id>
+
+# Add log entry
+pnpm cli:dev log <task-id> --message "Progress update"
+
+# Manage agents
+pnpm cli:dev agent list
+pnpm cli:dev agent detect
 ```
 
-## 项目结构
+## REST API
+
+LumiTask exposes a full REST API at `http://localhost:3179/api`.
+
+### Tasks
+
+```bash
+# Create task
+curl -X POST http://localhost:3179/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title": "My task", "description": "Details here"}'
+
+# Create task with dependencies
+curl -X POST http://localhost:3179/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Deploy",
+    "dependsOn": ["task-id-1", "task-id-2"],
+    "inputContext": {"env": "production"}
+  }'
+
+# Create subtasks
+curl -X POST http://localhost:3179/api/tasks/{id}/subtasks \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"title": "Step 1", "sequential": true},
+    {"title": "Step 2", "sequential": true},
+    {"title": "Step 3", "sequential": true}
+  ]'
+
+# List tasks
+curl http://localhost:3179/api/tasks
+curl http://localhost:3179/api/tasks?status=running
+curl http://localhost:3179/api/tasks?parentTaskId={id}
+
+# Get task detail (includes dependencies, subtasks, logs)
+curl http://localhost:3179/api/tasks/{id}
+
+# Update task
+curl -X PATCH http://localhost:3179/api/tasks/{id} \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Updated title"}'
+
+# Execute task
+curl -X POST http://localhost:3179/api/tasks/{id}/execute
+
+# Block with structured decision
+curl -X POST http://localhost:3179/api/tasks/{id}/block \
+  -H "Content-Type: application/json" \
+  -d '{
+    "decision": {
+      "type": "choose",
+      "question": "Which database?",
+      "options": [
+        {"id": "pg", "label": "PostgreSQL"},
+        {"id": "mysql", "label": "MySQL"}
+      ]
+    }
+  }'
+
+# Reply to blocked task
+curl -X POST http://localhost:3179/api/tasks/{id}/reply \
+  -H "Content-Type: application/json" \
+  -d '{"body": "Use PostgreSQL"}'
+
+# Delete task
+curl -X DELETE http://localhost:3179/api/tasks/{id}
+```
+
+### Agents
+
+```bash
+curl http://localhost:3179/api/agents              # List agents
+curl -X POST http://localhost:3179/api/agents/detect  # Auto-detect agents
+```
+
+### Events (SSE)
+
+```bash
+curl http://localhost:3179/api/events   # Server-sent events stream
+```
+
+## OpenClaw Integration
+
+See [docs/openclaw-guide.md](docs/openclaw-guide.md) for how to connect your OpenClaw agents to LumiTask.
+
+## Desktop App (Electron)
+
+```bash
+pnpm add -D electron electron-builder @electron/rebuild
+pnpm electron:dev
+```
+
+Build distributable:
+```bash
+pnpm electron:build
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16 + React 19 + Tailwind CSS v4 + Radix UI |
+| Backend | Next.js API Routes + SSE |
+| Database | SQLite + Drizzle ORM |
+| State | TanStack React Query v5 |
+| CLI | Commander.js |
+| Desktop | Electron 41 |
+| Testing | Vitest |
+
+## Project Structure
 
 ```
 src/
-├── app/                # Next.js 页面和 API 路由
-│   ├── api/            # RESTful API（tasks, agents, cron, events, inbox）
-│   ├── tasks/          # 任务看板和详情页
-│   ├── inbox/          # 快速收集想法
-│   ├── cron/           # 定时任务管理
-│   └── settings/       # 系统设置
+├── app/                    # Pages and API routes
+│   ├── api/tasks/          # Task CRUD, execute, block, reply, subtasks
+│   ├── api/agents/         # Agent detection and management
+│   ├── api/cron/           # OpenClaw cron job sync
+│   ├── api/notifications/  # Channel discovery and test
+│   └── api/events/         # SSE stream
 ├── lib/
-│   ├── db/             # 数据库 Schema 和初始化
-│   ├── agents/         # Agent 适配器、执行引擎、调度器
-│   └── events.ts       # SSE 事件总线
-├── components/         # UI 组件（看板、任务表单、侧边栏等）
-└── hooks/              # React Hooks（SSE 集成）
-cli/                    # 命令行工具
+│   ├── agents/             # Adapters, executor, scheduler, concurrency
+│   ├── notifications/      # Notification manager + OpenClaw channel sender
+│   ├── openclaw-client/    # Local/Remote OpenClaw client abstraction
+│   └── db/                 # SQLite schema
+├── components/             # UI (kanban, task drawer, decision card)
+└── instrumentation.ts      # Port discovery file writer
+
+cli/                        # CLI tool
+electron/                   # Desktop app (main, preload, server)
 ```
 
-## 许可证
+## Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Port | `3179` | Web server port |
+| `LUMITASK_API_URL` | `http://127.0.0.1:3179/api` | Override API URL for CLI |
+| `LUMITASK_URL` | `http://localhost:3179` | Base URL for notification links |
+| `PORT` | `3179` | Override server port |
+
+Port is auto-discovered: the server writes `~/.lumitask/port` on startup, CLI reads it automatically.
+
+## License
 
 MIT

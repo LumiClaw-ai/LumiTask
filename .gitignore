@@ -46,3 +46,6 @@ next-env.d.ts
 /data/*.db-shm
 electron/dist/
 data/
+
+# internal docs (keep local only, public docs go in /guide)
+/docs/

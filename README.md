@@ -152,7 +152,7 @@ curl http://localhost:3179/api/events   # Server-sent events stream
 
 ## OpenClaw Integration
 
-See [docs/openclaw-guide.md](docs/openclaw-guide.md) for how to connect your OpenClaw agents to LumiTask.
+See [guide/openclaw-guide.md](guide/openclaw-guide.md) for how to connect your OpenClaw agents to LumiTask.
 
 ## Desktop App (Electron)
 

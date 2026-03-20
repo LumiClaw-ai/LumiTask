@@ -1,215 +1,101 @@
 # LumiTask
 
-Lightweight, self-hosted AI Agent task management platform.
+轻量级、开源的 AI Agent 任务管理平台。
 
-LumiTask is an open-source task orchestration center for AI coding agents (Claude Code, OpenClaw, and more). Create, assign, execute, and monitor agent tasks with real-time streaming, dependency chains, and multi-agent support.
+让你的 AI 小龙虾（[OpenClaw](https://openclaw.ai) Agent）帮你管理和执行任务——创建待办、拆解步骤、自动执行、完成后通知你。
 
-**Part of the [LumiClaw](https://lumiclaw.ai) ecosystem.**
+**[LumiClaw](https://lumiclaw.ai) 开源项目**
 
-## Features
+---
 
-- **Task lifecycle** — `open → assigned → running → done/failed/blocked`, with Kanban board view
-- **Task dependencies** — Chain tasks with `dependsOn`, auto-execute when predecessors complete
-- **Subtask decomposition** — Break complex tasks into sequential/parallel subtasks
-- **Multi-agent** — Pluggable adapter architecture, built-in support for Claude Code and OpenClaw
-- **Real-time streaming** — SSE-based live execution progress, tool calls, token usage
-- **Structured I/O** — Pass structured `inputContext` between tasks, collect `outputResult`
-- **Decision system** — Agents can request human decisions (confirm/choose/input/approve)
-- **Notification channels** — Push to Feishu, Discord, Telegram via OpenClaw agent channels
-- **Remote agents** — Connect to OpenClaw Gateway on remote servers via connection code
-- **Scheduled & recurring** — One-time, cron-based, and immediate task execution
-- **Cost tracking** — Automatic token counting and cost calculation per task
-- **CLI tool** — Full task management from terminal
-- **Desktop app** — Electron app with system tray (macOS)
+## 它能做什么？
 
-## Quick Start
+- **任务看板** — 一眼看到所有任务的状态（待办、执行中、已完成、失败）
+- **自动执行** — 分配给 Agent 的任务会自动运行，你只需等结果
+- **任务依赖** — A 做完了再做 B，支持任务链自动串联
+- **子任务拆解** — 大任务自动拆成小步骤，逐步执行
+- **需要你决定时会问你** — Agent 遇到需要人拿主意的事，会暂停并通知你
+- **多渠道通知** — 任务完成或失败时，通过飞书/Discord/Telegram 通知你
+- **远程连接** — Agent 在服务器上也能管，粘贴一段连接码就行
+- **桌面应用** — 双击打开，不用命令行（macOS）
+
+---
+
+## 快速开始
+
+### 1. 安装并启动
 
 ```bash
 git clone https://github.com/LumiClaw-ai/LumiTask.git
 cd LumiTask
 pnpm install
 pnpm dev
-
-# Open http://localhost:3179
 ```
 
-## CLI
+启动后打开浏览器访问 **http://localhost:3179**
 
-```bash
-# Create a task
-pnpm cli:dev create --title "Refactor auth module" --description "Migrate to new middleware"
+### 2. 让你的小龙虾接入
 
-# Create with agent assignment
-pnpm cli:dev create --title "Fix login bug" --assign "claude-code"
+把下面这段话发给你的 OpenClaw Agent（飞书、Telegram、Discord 都行）：
 
-# Create with immediate execution
-pnpm cli:dev create --title "Run tests" --schedule immediate
+> 请阅读这份说明书并安装对应的 Skill：
+> https://github.com/LumiClaw-ai/LumiTask/blob/main/guide/openclaw-guide.md
+>
+> 这是一个任务管理工具 LumiTask，安装 Skill 后你就可以帮我创建、管理和执行任务了。
 
-# List tasks
-pnpm cli:dev list
+小龙虾会自动阅读说明、安装 Skill，之后你就可以直接对它说：
 
-# Show task details
-pnpm cli:dev show <task-id>
+- "帮我创建一个任务：重构登录模块"
+- "把这个大任务拆成几个步骤"
+- "看看现在有哪些任务在跑"
 
-# Start a task
-pnpm cli:dev start <task-id>
+所有任务都会出现在 LumiTask 的看板上。
 
-# Complete / fail / block / reopen
-pnpm cli:dev complete <task-id>
-pnpm cli:dev fail <task-id> --reason "Build failed"
-pnpm cli:dev block <task-id> --reason "Need API key"
-pnpm cli:dev reopen <task-id>
+### 3. 桌面应用（可选）
 
-# Add log entry
-pnpm cli:dev log <task-id> --message "Progress update"
-
-# Manage agents
-pnpm cli:dev agent list
-pnpm cli:dev agent detect
-```
-
-## REST API
-
-LumiTask exposes a full REST API at `http://localhost:3179/api`.
-
-### Tasks
-
-```bash
-# Create task
-curl -X POST http://localhost:3179/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"title": "My task", "description": "Details here"}'
-
-# Create task with dependencies
-curl -X POST http://localhost:3179/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Deploy",
-    "dependsOn": ["task-id-1", "task-id-2"],
-    "inputContext": {"env": "production"}
-  }'
-
-# Create subtasks
-curl -X POST http://localhost:3179/api/tasks/{id}/subtasks \
-  -H "Content-Type: application/json" \
-  -d '[
-    {"title": "Step 1", "sequential": true},
-    {"title": "Step 2", "sequential": true},
-    {"title": "Step 3", "sequential": true}
-  ]'
-
-# List tasks
-curl http://localhost:3179/api/tasks
-curl http://localhost:3179/api/tasks?status=running
-curl http://localhost:3179/api/tasks?parentTaskId={id}
-
-# Get task detail (includes dependencies, subtasks, logs)
-curl http://localhost:3179/api/tasks/{id}
-
-# Update task
-curl -X PATCH http://localhost:3179/api/tasks/{id} \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Updated title"}'
-
-# Execute task
-curl -X POST http://localhost:3179/api/tasks/{id}/execute
-
-# Block with structured decision
-curl -X POST http://localhost:3179/api/tasks/{id}/block \
-  -H "Content-Type: application/json" \
-  -d '{
-    "decision": {
-      "type": "choose",
-      "question": "Which database?",
-      "options": [
-        {"id": "pg", "label": "PostgreSQL"},
-        {"id": "mysql", "label": "MySQL"}
-      ]
-    }
-  }'
-
-# Reply to blocked task
-curl -X POST http://localhost:3179/api/tasks/{id}/reply \
-  -H "Content-Type: application/json" \
-  -d '{"body": "Use PostgreSQL"}'
-
-# Delete task
-curl -X DELETE http://localhost:3179/api/tasks/{id}
-```
-
-### Agents
-
-```bash
-curl http://localhost:3179/api/agents              # List agents
-curl -X POST http://localhost:3179/api/agents/detect  # Auto-detect agents
-```
-
-### Events (SSE)
-
-```bash
-curl http://localhost:3179/api/events   # Server-sent events stream
-```
-
-## OpenClaw Integration
-
-See [guide/openclaw-guide.md](guide/openclaw-guide.md) for how to connect your OpenClaw agents to LumiTask.
-
-## Desktop App (Electron)
+如果你不想用命令行启动，可以打包成桌面应用：
 
 ```bash
 pnpm add -D electron electron-builder @electron/rebuild
 pnpm electron:dev
 ```
 
-Build distributable:
-```bash
-pnpm electron:build
-```
+---
 
-## Tech Stack
+## 截图
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 16 + React 19 + Tailwind CSS v4 + Radix UI |
-| Backend | Next.js API Routes + SSE |
-| Database | SQLite + Drizzle ORM |
-| State | TanStack React Query v5 |
-| CLI | Commander.js |
-| Desktop | Electron 41 |
-| Testing | Vitest |
+> 看板视图、任务详情、决策卡片等截图（待补充）
 
-## Project Structure
+---
 
-```
-src/
-├── app/                    # Pages and API routes
-│   ├── api/tasks/          # Task CRUD, execute, block, reply, subtasks
-│   ├── api/agents/         # Agent detection and management
-│   ├── api/cron/           # OpenClaw cron job sync
-│   ├── api/notifications/  # Channel discovery and test
-│   └── api/events/         # SSE stream
-├── lib/
-│   ├── agents/             # Adapters, executor, scheduler, concurrency
-│   ├── notifications/      # Notification manager + OpenClaw channel sender
-│   ├── openclaw-client/    # Local/Remote OpenClaw client abstraction
-│   └── db/                 # SQLite schema
-├── components/             # UI (kanban, task drawer, decision card)
-└── instrumentation.ts      # Port discovery file writer
+## 配置
 
-cli/                        # CLI tool
-electron/                   # Desktop app (main, preload, server)
-```
+| 设置 | 默认值 | 说明 |
+|------|--------|------|
+| 端口 | `3179` | 网页和 API 的访问端口 |
+| 数据库 | `data/lumitask.db` | 本地 SQLite，数据都在你自己电脑上 |
 
-## Configuration
+端口会自动写入 `~/.lumitask/port`，Agent 会自动发现，不需要手动配置。
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Port | `3179` | Web server port |
-| `LUMITASK_API_URL` | `http://127.0.0.1:3179/api` | Override API URL for CLI |
-| `LUMITASK_URL` | `http://localhost:3179` | Base URL for notification links |
-| `PORT` | `3179` | Override server port |
+---
 
-Port is auto-discovered: the server writes `~/.lumitask/port` on startup, CLI reads it automatically.
+## 远程 Agent
+
+如果你的小龙虾跑在远程服务器上：
+
+1. 在服务器上运行 `openclaw qr --setup-code-only`，得到一段连接码
+2. 打开 LumiTask 设置页 → Agent 连接 → 远程模式 → 粘贴连接码
+3. 点击连接，完成
+
+或者直接问你的小龙虾："给我 LumiTask 连接码"，它会告诉你。
+
+---
+
+## 技术栈
+
+Next.js 16 · React 19 · Tailwind CSS v4 · SQLite · Drizzle ORM · Electron
+
+---
 
 ## License
 

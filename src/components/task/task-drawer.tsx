@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { X, Copy, Check } from 'lucide-react'
+import { X, Copy, Check, GitBranch, ListTree } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { fetchTask } from '@/lib/api'
@@ -12,6 +12,7 @@ import { formatTokens, formatCost, timeAgo } from '@/lib/utils'
 import { TaskActions } from './task-actions'
 import { CommentsList } from './comments-list'
 import { LogsList } from './logs-list'
+import { DecisionCard } from './decision-card'
 
 function formatDate(ts?: number | null) {
   if (!ts) return '-'
@@ -33,7 +34,7 @@ interface TaskDrawerProps {
   onClose: () => void
 }
 
-type Tab = 'comments' | 'logs'
+type Tab = 'logs' | 'comments'
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-zinc-800 ${className || ''}`} />
@@ -42,7 +43,7 @@ function Skeleton({ className }: { className?: string }) {
 export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
   const [resultExpanded, setResultExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [activeTab, setActiveTab] = useState<Tab>('comments')
+  const [activeTab, setActiveTab] = useState<Tab>('logs')
 
   const { data: task, isLoading } = useQuery({
     queryKey: ['task', taskId],
@@ -60,8 +61,8 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
 
   // Auto-switch tab based on status
   useEffect(() => {
-    if (task?.status === 'running') setActiveTab('logs')
-    else if (task?.status === 'done' || task?.status === 'blocked') setActiveTab('comments')
+    if (task?.status === 'blocked') setActiveTab('comments')
+    else setActiveTab('logs')
   }, [task?.status])
 
   useEffect(() => {
@@ -100,7 +101,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl flex flex-col bg-zinc-950 border-l border-zinc-800 shadow-2xl animate-in slide-in-from-right duration-200">
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl flex flex-col bg-zinc-950 border-l border-zinc-800 shadow-2xl animate-in slide-in-from-right duration-200 pt-10">
         {isLoading ? (
           <div className="px-5 py-4 border-b border-zinc-800 space-y-3">
             <div className="flex items-center justify-between">
@@ -180,6 +181,65 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                 </div>
               )}
 
+              {/* Dependencies */}
+              {task.dependencies && task.dependencies.length > 0 && (
+                <div className="mx-5 mb-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                  <h3 className="text-xs font-medium text-zinc-400 mb-2 flex items-center gap-1.5">
+                    <GitBranch className="h-3 w-3" /> 前置依赖
+                  </h3>
+                  <div className="space-y-1.5">
+                    {task.dependencies.map(dep => (
+                      <div key={dep.id} className="flex items-center gap-2 text-sm">
+                        <span className={
+                          dep.status === 'done' ? 'text-green-400' :
+                          dep.status === 'failed' ? 'text-red-400' :
+                          dep.status === 'running' ? 'text-blue-400' :
+                          'text-zinc-500'
+                        }>
+                          {dep.status === 'done' ? '✓' : dep.status === 'failed' ? '✗' : dep.status === 'running' ? '◉' : '○'}
+                        </span>
+                        <span className="text-zinc-500 font-mono text-xs">#{dep.number}</span>
+                        <span className="text-zinc-300 truncate">{dep.title}</span>
+                        <Badge variant={dep.status as any} className="ml-auto text-[10px] py-0">{dep.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Subtasks */}
+              {task.subtasks && task.subtasks.length > 0 && (
+                <div className="mx-5 mb-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                  <h3 className="text-xs font-medium text-zinc-400 mb-2 flex items-center gap-1.5">
+                    <ListTree className="h-3 w-3" /> 子任务 ({task.subtasks.filter(s => s.status === 'done').length}/{task.subtasks.length})
+                  </h3>
+                  <div className="space-y-1.5">
+                    {task.subtasks.map(sub => (
+                      <div key={sub.id} className="flex items-center gap-2 text-sm">
+                        <span className={
+                          sub.status === 'done' ? 'text-green-400' :
+                          sub.status === 'failed' ? 'text-red-400' :
+                          sub.status === 'running' ? 'text-blue-400' :
+                          'text-zinc-500'
+                        }>
+                          {sub.status === 'done' ? '✓' : sub.status === 'failed' ? '✗' : sub.status === 'running' ? '◉' : '○'}
+                        </span>
+                        <span className="text-zinc-500 font-mono text-xs">#{sub.number}</span>
+                        <span className="text-zinc-300 truncate">{sub.title}</span>
+                        <Badge variant={sub.status as any} className="ml-auto text-[10px] py-0">{sub.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Retry info */}
+              {(task.retryCount ?? 0) > 0 && (
+                <div className="mx-5 mb-3">
+                  <span className="text-xs text-zinc-500">重试 {task.retryCount}/{task.maxRetries ?? 0}</span>
+                </div>
+              )}
+
               {(task.summary || task.result) && (
                 <div className="mx-5 mb-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 space-y-2">
                   <div className="flex items-center justify-between">
@@ -248,10 +308,7 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
               )}
 
               {task.blockReason && (
-                <div className="mx-5 mb-3 rounded-lg border border-red-900/50 bg-red-950/30 p-3">
-                  <h3 className="text-xs font-medium text-red-400 mb-1">已阻塞</h3>
-                  <p className="text-sm text-zinc-400">{task.blockReason}</p>
-                </div>
+                <DecisionCard taskId={task.id} blockReason={task.blockReason} />
               )}
 
               {task.failReason && (
@@ -277,16 +334,6 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
               {/* Tab bar — sticky within scroll */}
               <div className="flex border-t border-b border-zinc-800 sticky top-0 bg-zinc-950 z-10">
                 <button
-                  onClick={() => setActiveTab('comments')}
-                  className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                    activeTab === 'comments'
-                      ? 'text-zinc-100 border-b-2 border-blue-500'
-                      : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'
-                  }`}
-                >
-                  评论 {comments.length > 0 && `(${comments.length})`}
-                </button>
-                <button
                   onClick={() => setActiveTab('logs')}
                   className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
                     activeTab === 'logs'
@@ -295,6 +342,16 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                   }`}
                 >
                   日志 {logs.length > 0 && `(${logs.length})`}
+                </button>
+                <button
+                  onClick={() => setActiveTab('comments')}
+                  className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                    activeTab === 'comments'
+                      ? 'text-zinc-100 border-b-2 border-blue-500'
+                      : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'
+                  }`}
+                >
+                  评论 {comments.length > 0 && `(${comments.length})`}
                 </button>
               </div>
 

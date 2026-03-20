@@ -1,37 +1,73 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execSync } from "child_process";
 import { findOpenClawBinary } from "@/lib/agents/openclaw-detect";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 
 function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, "").trim();
 }
 
-function parseJsonFromOutput(output: string): any {
+function parseJsonFromOutput(output: string): unknown {
   const clean = stripAnsi(output);
-  let start = clean.indexOf("[");
-  const objStart = clean.indexOf("{");
-  if (objStart >= 0 && (start < 0 || objStart < start)) start = objStart;
+  // Find the first [ or {
+  let start = -1;
+  for (let i = 0; i < clean.length; i++) {
+    if (clean[i] === "[" || clean[i] === "{") { start = i; break; }
+  }
   if (start < 0) return [];
 
-  const openChar = clean[start];
-  const closeChar = openChar === "[" ? "]" : "}";
-  let depth = 0;
+  // Use a stack to handle all bracket types correctly
+  const pairs: Record<string, string> = { "{": "}", "[": "]" };
+  const closers = new Set(Object.values(pairs));
+  const stack: string[] = [];
   let end = -1;
+
   for (let i = start; i < clean.length; i++) {
-    if (clean[i] === openChar) depth++;
-    else if (clean[i] === closeChar) {
-      depth--;
-      if (depth === 0) { end = i; break; }
+    const ch = clean[i];
+    if (pairs[ch]) {
+      stack.push(pairs[ch]);
+    } else if (closers.has(ch)) {
+      if (stack.length === 0 || stack[stack.length - 1] !== ch) break;
+      stack.pop();
+      if (stack.length === 0) { end = i; break; }
     }
   }
+
   if (end < 0) return [];
-  return JSON.parse(clean.slice(start, end + 1));
+  try { return JSON.parse(clean.slice(start, end + 1)); }
+  catch { return []; }
+}
+
+/** Map OpenClaw local job format to LumiTask CronJob format */
+function mapOpenClawJob(job: any): any {
+  return {
+    id: job.id,
+    name: job.name || "",
+    description: job.payload?.message || "",
+    cron: job.schedule?.expr || "",
+    every: job.schedule?.kind === "interval" ? job.schedule?.expr : undefined,
+    agent: job.agentId || "",
+    message: job.payload?.message || "",
+    enabled: job.enabled ?? true,
+    lastRunAt: job.state?.lastRunAtMs ? new Date(job.state.lastRunAtMs).toISOString() : undefined,
+    nextRunAt: job.state?.nextRunAtMs ? new Date(job.state.nextRunAtMs).toISOString() : undefined,
+  };
+}
+
+/** Read cron jobs directly from ~/.openclaw/cron/jobs.json */
+function readLocalCronJobs(): any[] {
+  try {
+    const openclawHome = process.env.OPENCLAW_HOME || join(homedir(), ".openclaw");
+    const jobsPath = join(openclawHome, "cron", "jobs.json");
+    if (!existsSync(jobsPath)) return [];
+    const data = JSON.parse(readFileSync(jobsPath, "utf-8"));
+    return (data.jobs || []).map(mapOpenClawJob);
+  } catch { return []; }
 }
 
 // File-based cache (survives Next.js dev module reloads)
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
-
 const CACHE_DIR = join(process.cwd(), "data");
 const CACHE_FILE = join(CACHE_DIR, ".cron-cache.json");
 const CACHE_TTL = 60000;
@@ -56,21 +92,39 @@ async function getCronJobsCached(): Promise<any[]> {
     return cache.data;
   }
 
+  // Try CLI first
   const binaryPath = await findOpenClawBinary();
-  if (!binaryPath) return cache?.data || [];
-
-  try {
-    const raw = execSync(`"${binaryPath}" cron list --json 2>/dev/null`, {
-      encoding: "utf-8",
-      timeout: 30000,
-    });
-    const jobs = parseJsonFromOutput(stripAnsi(raw));
-    const result = Array.isArray(jobs) ? jobs : [];
-    writeCache(result);
-    return result;
-  } catch {
-    return cache?.data || [];
+  if (binaryPath) {
+    try {
+      const raw = execSync(`"${binaryPath}" cron list --json 2>/dev/null`, {
+        encoding: "utf-8",
+        timeout: 30000,
+      });
+      const parsed = parseJsonFromOutput(raw);
+      // CLI returns { jobs: [...] } or [...]
+      let jobs: any[];
+      if (Array.isArray(parsed)) {
+        jobs = parsed;
+      } else if (parsed && typeof parsed === "object" && Array.isArray((parsed as any).jobs)) {
+        jobs = (parsed as any).jobs.map(mapOpenClawJob);
+      } else {
+        jobs = [];
+      }
+      if (jobs.length > 0) {
+        writeCache(jobs);
+        return jobs;
+      }
+    } catch {}
   }
+
+  // Fallback: read local jobs.json directly
+  const localJobs = readLocalCronJobs();
+  if (localJobs.length > 0) {
+    writeCache(localJobs);
+    return localJobs;
+  }
+
+  return cache?.data || [];
 }
 
 function invalidateCronCache() {

@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const dateFrom = url.searchParams.get("dateFrom");
     const dateTo = url.searchParams.get("dateTo");
 
+    const parentTaskId = url.searchParams.get("parentTaskId");
+
     const conditions = [];
     // Exclude inbox items from regular task list
     if (!status) conditions.push(ne(tasks.status, "inbox"));
@@ -24,6 +26,7 @@ export async function GET(request: NextRequest) {
     if (unassigned === "true") conditions.push(isNull(tasks.assigneeAgentId));
     if (dateFrom) conditions.push(gte(tasks.createdAt, parseInt(dateFrom)));
     if (dateTo) conditions.push(lte(tasks.createdAt, parseInt(dateTo)));
+    if (parentTaskId) conditions.push(eq(tasks.parentTaskId, parentTaskId));
 
     const query = db
       .select()
@@ -119,6 +122,14 @@ export async function POST(request: NextRequest) {
       scheduleNextAt,
       source: body.source ?? "web",
       dueAt: body.dueAt ?? null,
+      // Dependencies & structure
+      dependsOn: body.dependsOn ? JSON.stringify(body.dependsOn) : null,
+      parentTaskId: body.parentTaskId ?? null,
+      // Structured I/O
+      inputContext: body.inputContext ? JSON.stringify(body.inputContext) : null,
+      // Concurrency & retry
+      concurrencyKey: body.concurrencyKey ?? null,
+      maxRetries: body.maxRetries ?? 0,
       createdAt: now,
       updatedAt: now,
     };

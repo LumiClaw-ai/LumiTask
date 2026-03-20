@@ -26,6 +26,17 @@ export interface Task {
   scheduleAt?: number | null
   scheduleNextAt?: number | null
   scheduleLastAt?: number | null
+  // Dependencies & structure
+  dependsOn?: string | null
+  parentTaskId?: string | null
+  // Structured I/O
+  inputContext?: string | null
+  outputResult?: string | null
+  // Concurrency & retry
+  concurrencyKey?: string | null
+  retryCount?: number
+  maxRetries?: number
+  // Results
   summary?: string | null
   result?: string | null
   blockReason?: string | null
@@ -46,6 +57,9 @@ export interface Task {
   agent?: Agent | null
   activityLog?: ActivityLogEntry[]
   artifacts?: Artifact[]
+  // Resolved relations (from GET /api/tasks/:id)
+  dependencies?: { id: string; number: number; title: string; status: string }[]
+  subtasks?: { id: string; number: number; title: string; status: string; assigneeAgentId?: string | null }[]
 }
 
 export interface Agent {

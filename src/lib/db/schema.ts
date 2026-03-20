@@ -29,6 +29,16 @@ export const tasks = sqliteTable("tasks", {
   scheduleAt: integer("schedule_at"),
   scheduleNextAt: integer("schedule_next_at"),
   scheduleLastAt: integer("schedule_last_at"),
+  // Dependencies & structure
+  dependsOn: text("depends_on"), // JSON string[] of task IDs
+  parentTaskId: text("parent_task_id").references((): any => tasks.id),
+  // Structured I/O
+  inputContext: text("input_context"), // JSON — structured input for agent
+  outputResult: text("output_result"), // JSON — structured output from agent
+  // Concurrency & retry
+  concurrencyKey: text("concurrency_key"),
+  retryCount: integer("retry_count").default(0),
+  maxRetries: integer("max_retries").default(0),
   // Results
   summary: text("summary"),
   result: text("result"),

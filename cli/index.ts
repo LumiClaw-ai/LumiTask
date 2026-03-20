@@ -16,7 +16,7 @@ import { registerAgent } from './commands/agent'
 const program = new Command()
 
 program
-  .name('clawtask')
+  .name('lumitask')
   .description('Lightweight agent task management CLI')
   .version('0.1.0')
 

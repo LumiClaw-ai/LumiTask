@@ -5,7 +5,7 @@ import { mkdirSync } from "fs";
 import { resolve } from "path";
 import * as schema from "./schema";
 
-const DB_PATH = resolve(process.cwd(), "data", "clawtask.db");
+const DB_PATH = resolve(process.cwd(), "data", "lumitask.db");
 
 let _db: ReturnType<typeof createDb> | null = null;
 

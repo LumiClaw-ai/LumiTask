@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: "./data/clawtask.db",
+    url: "./data/lumitask.db",
   },
 });

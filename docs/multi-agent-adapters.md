@@ -1,4 +1,4 @@
-# ClawTask 多 Agent Adapter 方案 + 子任务设计
+# LumiTask 多 Agent Adapter 方案 + 子任务设计
 
 ## 调研结论
 
@@ -27,7 +27,7 @@ spawn CLI进程 → stdin 传入 prompt → stdout 流式读取 JSONL → 解析
 
 ---
 
-## ClawTask Adapter 扩展方案
+## LumiTask Adapter 扩展方案
 
 ### 现有 Adapter
 
@@ -275,7 +275,7 @@ OpenClaw 的子 agent 机制不同于 Claude Code：
   → 结果通过 sessions_send 返回父 session
 ```
 
-### 在 ClawTask 中追踪
+### 在 LumiTask 中追踪
 
 ```
 Session Observer 检测到新的 session 出现

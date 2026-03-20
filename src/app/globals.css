@@ -101,3 +101,14 @@ body {
   .activity-row-enter { animation: none; }
   .animate-quiet-pulse { animation: none; }
 }
+
+/* Electron: draggable title bar region */
+.draggable-region {
+  -webkit-app-region: drag;
+}
+.draggable-region button,
+.draggable-region a,
+.draggable-region input,
+.draggable-region select {
+  -webkit-app-region: no-drag;
+}

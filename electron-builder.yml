@@ -1,0 +1,39 @@
+appId: "com.lumitask.app"
+productName: "LumiTask"
+
+mac:
+  target:
+    - target: dir
+      arch: [arm64]
+  icon: electron/icons/app-icon.icns
+  category: public.app-category.developer-tools
+  entitlements: electron/entitlements.mac.plist
+  entitlementsInherit: electron/entitlements.mac.plist
+
+directories:
+  output: release
+  buildResources: electron
+
+files:
+  - "electron/dist/**/*"
+  - "electron/icons/**/*"
+
+extraResources:
+  - from: ".next/standalone"
+    to: "standalone"
+    filter:
+      - "**/*"
+  - from: ".next/static"
+    to: "standalone/.next/static"
+    filter:
+      - "**/*"
+  - from: "public"
+    to: "standalone/public"
+    filter:
+      - "**/*"
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+npmRebuild: false

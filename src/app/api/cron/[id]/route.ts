@@ -1,27 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execSync } from "child_process";
 import { findOpenClawBinary } from "@/lib/agents/openclaw-detect";
+import { getCronJobsCached, invalidateCronCache } from "../route";
 
 function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, "").trim();
-}
-
-function parseJsonFromOutput(output: string): any {
-  const clean = stripAnsi(output);
-  let start = clean.indexOf("[");
-  const objStart = clean.indexOf("{");
-  if (objStart >= 0 && (start < 0 || objStart < start)) start = objStart;
-  if (start < 0) return [];
-  const openChar = clean[start];
-  const closeChar = openChar === "[" ? "]" : "}";
-  let depth = 0;
-  let end = -1;
-  for (let i = start; i < clean.length; i++) {
-    if (clean[i] === openChar) depth++;
-    else if (clean[i] === closeChar) { depth--; if (depth === 0) { end = i; break; } }
-  }
-  if (end < 0) return [];
-  return JSON.parse(clean.slice(start, end + 1));
 }
 
 async function runOpenClawCommand(args: string[]): Promise<string> {
@@ -40,9 +23,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const output = await runOpenClawCommand(["cron", "list", "--json", "2>/dev/null"]);
-    const jobs = parseJsonFromOutput(output);
-    const job = Array.isArray(jobs) ? jobs.find((j: any) => j.id === id) : null;
+    const jobs = await getCronJobsCached();
+    const job = jobs.find((j: any) => j.id === id);
     if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(job);
   } catch (error) {
@@ -77,6 +59,7 @@ export async function PATCH(
       await runOpenClawCommand(editArgs);
     }
 
+    invalidateCronCache();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Cron edit error:", error);
@@ -91,6 +74,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     await runOpenClawCommand(["cron", "rm", id, "2>/dev/null"]);
+    invalidateCronCache();
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete cron job" }, { status: 500 });

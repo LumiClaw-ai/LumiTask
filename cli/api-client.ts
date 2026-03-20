@@ -1,4 +1,25 @@
-const BASE_URL = process.env.CLAWTASK_API_URL || 'http://127.0.0.1:3000/api'
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
+import { homedir } from 'os'
+
+function discoverBaseUrl(): string {
+  if (process.env.LUMITASK_API_URL) return process.env.LUMITASK_API_URL
+
+  // Try to read port from Electron's port file
+  try {
+    const portFile = join(homedir(), '.lumitask', 'port')
+    if (existsSync(portFile)) {
+      const port = readFileSync(portFile, 'utf-8').trim()
+      if (port && /^\d+$/.test(port)) {
+        return `http://127.0.0.1:${port}/api`
+      }
+    }
+  } catch {}
+
+  return 'http://127.0.0.1:3179/api'
+}
+
+const BASE_URL = discoverBaseUrl()
 
 async function request(method: string, path: string, body?: any) {
   const url = `${BASE_URL}${path}`

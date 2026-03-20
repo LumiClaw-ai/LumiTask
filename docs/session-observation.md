@@ -1,4 +1,4 @@
-# ClawTask Session 观察机制分析
+# LumiTask Session 观察机制分析
 
 ## 回答核心问题
 
@@ -57,7 +57,7 @@ Session index：`~/.openclaw/agents/{agentId}/sessions/sessions.json`
 
 ---
 
-## ClawTask 的 Session 观察方案
+## LumiTask 的 Session 观察方案
 
 ### 方案：轮询 + Tail 读取
 
@@ -66,14 +66,14 @@ Session index：`~/.openclaw/agents/{agentId}/sessions/sessions.json`
   1. 读取 sessions.json → 获取所有活跃 session
   2. 对比上次快照 → 找出 updatedAt 变化的 session
   3. 对变化的 session → tail 读取 JSONL 最后 N 行
-  4. 解析新消息 → 写入 ClawTask activityLog
+  4. 解析新消息 → 写入 LumiTask activityLog
   5. 推送 SSE → 前端实时显示
 ```
 
 ### 数据映射
 
 ```typescript
-// Session JSONL 行 → ClawTask ActivityLogEntry
+// Session JSONL 行 → LumiTask ActivityLogEntry
 
 {
   // OpenClaw session message
@@ -91,7 +91,7 @@ Session index：`~/.openclaw/agents/{agentId}/sessions/sessions.json`
 
 ↓ 映射为 ↓
 
-// ClawTask activity log entries
+// LumiTask activity log entries
 [
   { action: "task.progress", message: "我来查一下天气", actorId: "旺财" },
   { action: "tool.use", toolName: "exec", toolInput: "curl wttr.in/...", actorId: "旺财" },
@@ -113,11 +113,11 @@ GET /api/openclaw/sessions/:sessionId/tail?lines=20
 ```
 如果 session updatedAt 在 30 秒内没有变化，但任务仍是 running：
   → 说明 agent 可能在等待（API 调用、长时间思考）
-  → ClawTask 显示: "Agent 正在处理中... (45s)"
+  → LumiTask 显示: "Agent 正在处理中... (45s)"
 
 如果超过 5 分钟没有变化：
   → 可能卡住了
-  → ClawTask 通过 Toast 通知用户: "任务 #12 已运行 5 分钟无进展"
+  → LumiTask 通过 Toast 通知用户: "任务 #12 已运行 5 分钟无进展"
   → 如果配置了提醒，通过 OpenClaw 发消息给用户
 ```
 
@@ -128,7 +128,7 @@ GET /api/openclaw/sessions/:sessionId/tail?lines=20
   ↓
 调用 sessions_spawn 派遣子 agent
   ↓
-ClawTask 检测到新的子 session
+LumiTask 检测到新的子 session
   ↓
 在任务详情中显示:
   "📋 主任务: 整理社交媒体内容"

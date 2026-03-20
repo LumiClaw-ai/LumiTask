@@ -1,8 +1,8 @@
-# ClawTask
+# LumiTask
 
 轻量级、自托管的 AI Agent 任务管理与执行平台。
 
-ClawTask 是一个为 AI 编程 Agent（如 Claude Code、OpenClaw）设计的任务调度中心，让你可以创建、分配、执行和监控 AI Agent 的工作任务，并通过实时流式输出观察执行过程。
+LumiTask 是一个为 AI 编程 Agent（如 Claude Code、OpenClaw）设计的任务调度中心，让你可以创建、分配、执行和监控 AI Agent 的工作任务，并通过实时流式输出观察执行过程。
 
 ## 核心能力
 

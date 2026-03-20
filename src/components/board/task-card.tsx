@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Play, Loader2, MessageSquare, ScrollText } from 'lucide-react'
+import { Play, Loader2, MessageSquare, ScrollText, GitBranch, ListTree } from 'lucide-react'
 import { formatTokens, timeAgo } from '@/lib/utils'
 import { executeTask, type Task } from '@/lib/api'
 
@@ -79,8 +79,18 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
         {totalTokens > 0 && <span>{formatTokens(totalTokens)} tok</span>}
       </div>
 
-      {/* Row 4: counts + time */}
+      {/* Row 4: counts + deps + time */}
       <div className="flex items-center gap-3 text-xs text-zinc-600">
+        {task.dependsOn && (
+          <span className="flex items-center gap-0.5 text-amber-500/70" title="有前置依赖">
+            <GitBranch className="h-3 w-3" />
+          </span>
+        )}
+        {task.parentTaskId && (
+          <span className="flex items-center gap-0.5 text-blue-500/70" title="子任务">
+            <ListTree className="h-3 w-3" />
+          </span>
+        )}
         {(task.commentCount || 0) > 0 && (
           <span className="flex items-center gap-0.5">
             <MessageSquare className="h-3 w-3" />

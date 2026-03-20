@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { tasks, activityLog, artifacts, agents } from "@/lib/db/schema";
 import { eventBus } from "@/lib/events";
@@ -34,7 +34,32 @@ export async function GET(
       .from(artifacts)
       .where(eq(artifacts.taskId, id));
 
-    return NextResponse.json({ ...task, agent, activityLog: logs, artifacts: arts });
+    // Resolve dependency tasks
+    let dependencies: any[] = [];
+    if (task.dependsOn) {
+      try {
+        const depIds: string[] = JSON.parse(task.dependsOn);
+        if (depIds.length > 0) {
+          dependencies = await db.select({
+            id: tasks.id,
+            number: tasks.number,
+            title: tasks.title,
+            status: tasks.status,
+          }).from(tasks).where(inArray(tasks.id, depIds));
+        }
+      } catch {}
+    }
+
+    // Resolve subtasks
+    const subtasks = await db.select({
+      id: tasks.id,
+      number: tasks.number,
+      title: tasks.title,
+      status: tasks.status,
+      assigneeAgentId: tasks.assigneeAgentId,
+    }).from(tasks).where(eq(tasks.parentTaskId, id));
+
+    return NextResponse.json({ ...task, agent, activityLog: logs, artifacts: arts, dependencies, subtasks });
   } catch (error) {
     return NextResponse.json({ error: "Failed to get task" }, { status: 500 });
   }
@@ -50,9 +75,12 @@ export async function PATCH(
     const now = Date.now();
 
     const updates: Record<string, any> = { updatedAt: now };
-    for (const field of ["title", "description", "sortOrder", "dueAt", "workingDirectory", "scheduleType", "scheduleCron", "scheduleAt"]) {
+    for (const field of ["title", "description", "sortOrder", "dueAt", "workingDirectory", "scheduleType", "scheduleCron", "scheduleAt", "concurrencyKey", "maxRetries", "parentTaskId"]) {
       if (body[field] !== undefined) updates[field] = body[field];
     }
+    // JSON fields need serialization
+    if (body.dependsOn !== undefined) updates.dependsOn = body.dependsOn ? JSON.stringify(body.dependsOn) : null;
+    if (body.inputContext !== undefined) updates.inputContext = body.inputContext ? JSON.stringify(body.inputContext) : null;
 
     await db.update(tasks).set(updates).where(eq(tasks.id, id));
 

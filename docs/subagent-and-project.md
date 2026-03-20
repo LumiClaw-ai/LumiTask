@@ -47,7 +47,7 @@
 }
 ```
 
-### 在 ClawTask adapter 中怎么处理
+### 在 LumiTask adapter 中怎么处理
 
 ```typescript
 // claude-code-adapter.ts 的 handleStreamEvent 中：
@@ -118,7 +118,7 @@ projectId: text("project_id")  // 可选，关联项目
 
 // OpenClaw adapter 使用 projectId 作为 session-id
 const sessionId = context.projectId
-  ? `clawtask-project-${context.projectId}`
+  ? `lumitask-project-${context.projectId}`
   : 'main'  // 默认用 main session
 
 const args = ['agent', '--agent', agentId, '--session-id', sessionId, '--message', prompt, '--json']
@@ -167,7 +167,7 @@ tasks = {
   智能体: [🐶 旺财]
 
 如果选了"日常事务"项目：
-  → openclaw agent --session-id "clawtask-daily" --message "..."
+  → openclaw agent --session-id "lumitask-daily" --message "..."
   → 旺财在 "daily" session 中执行，记得之前的规则
 
 如果没选项目：
@@ -176,7 +176,7 @@ tasks = {
 
 在 Skill 中：
   用户说 "在网站项目里，帮我改一下首页"
-  → clawtask create --title "改首页" --project website --schedule immediate
+  → lumitask create --title "改首页" --project website --schedule immediate
 ```
 
 ### 关于项目在产品中的定位

@@ -49,7 +49,7 @@ function AgentCard({ agent }: { agent: Agent }) {
       : '离线'
 
   return (
-    <div className={`rounded-lg border border-zinc-800 border-l-2 ${statusColors[agent.status] || 'border-l-zinc-600'} bg-zinc-900/50 p-4 space-y-2.5 hover:border-zinc-700 transition-colors activity-row-enter ${isBusy ? 'shadow-[0_0_12px_-3px_rgba(168,85,247,0.15)]' : ''}`}>
+    <div className={`rounded-lg border border-zinc-800 border-l-2 ${statusColors[agent.status] || 'border-l-zinc-600'} bg-zinc-900/50 p-4 space-y-2.5 hover:border-zinc-700 transition-colors activity-row-enter overflow-hidden ${isBusy ? 'shadow-[0_0_12px_-3px_rgba(168,85,247,0.15)]' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2 flex-shrink-0">
@@ -77,15 +77,15 @@ function AgentCard({ agent }: { agent: Agent }) {
       {/* OpenClaw specific info */}
       {agent.adapterType === 'openclaw' && config.openclawAgentId && (
         <div className="text-xs text-zinc-600 space-y-0.5">
-          <div>ID: <span className="font-mono text-zinc-500">{config.openclawAgentId}</span></div>
-          {config.workspace && <div>工作目录: <span className="font-mono text-zinc-500">{config.workspace}</span></div>}
+          <div className="truncate">ID: <span className="font-mono text-zinc-500">{config.openclawAgentId}</span></div>
+          {config.workspace && <div className="truncate">工作目录: <span className="font-mono text-zinc-500">{config.workspace}</span></div>}
           {config.isDefault && <span className="text-yellow-500/80 text-[10px] uppercase tracking-wider font-semibold">★ 默认智能体</span>}
         </div>
       )}
 
       {/* Claude Code specific info */}
       {agent.adapterType === 'claude-code' && config.binaryPath && (
-        <div className="text-xs text-zinc-600">
+        <div className="text-xs text-zinc-600 truncate">
           <span className="font-mono text-zinc-500 text-[11px]">{config.binaryPath}</span>
         </div>
       )}

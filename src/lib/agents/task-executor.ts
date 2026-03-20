@@ -1,11 +1,13 @@
 import { nanoid } from 'nanoid'
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { tasks, activityLog } from '@/lib/db/schema'
 import { eventBus } from '@/lib/events'
 import { adapterManager } from './adapter-manager'
 import { ClaudeCodeAdapter } from './claude-code-adapter'
 import { OpenClawAdapter } from './openclaw-adapter'
+import { release } from './concurrency'
+import { notify, buildTaskNotification } from '@/lib/notifications/manager'
 import type { ExecutionEvent, TaskContext } from './adapter'
 
 // Register adapters
@@ -56,12 +58,45 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
 
   eventBus.broadcast('task.started', { taskId, number: task.number })
 
-  // Build context — use promptOverride for follow-up executions
+  // Build context — inject inputContext and dependency outputs
+  let description = promptOverride || task.description || ''
+
+  // Inject structured input context
+  if (task.inputContext) {
+    try {
+      const ctx = JSON.parse(task.inputContext)
+      description += `\n\n--- Input Context ---\n${JSON.stringify(ctx, null, 2)}`
+    } catch {}
+  }
+
+  // Inject outputs from dependency tasks
+  if (task.dependsOn) {
+    try {
+      const depIds: string[] = JSON.parse(task.dependsOn)
+      if (depIds.length > 0) {
+        const depTasks = await db.select({
+          number: tasks.number,
+          title: tasks.title,
+          outputResult: tasks.outputResult,
+          summary: tasks.summary,
+        }).from(tasks).where(inArray(tasks.id, depIds))
+
+        const depOutputs = depTasks
+          .filter(d => d.outputResult || d.summary)
+          .map(d => `Task #${d.number} (${d.title}): ${d.outputResult || d.summary}`)
+
+        if (depOutputs.length > 0) {
+          description += `\n\n--- Dependency Outputs ---\n${depOutputs.join('\n')}`
+        }
+      }
+    } catch {}
+  }
+
   const context: TaskContext = {
     taskId,
     taskNumber: task.number,
-    title: promptOverride ? task.title : task.title,
-    description: promptOverride || task.description,
+    title: task.title,
+    description,
     workingDirectory: task.workingDirectory,
     agentConfig: agent.adapterConfig,
   }
@@ -101,6 +136,7 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
       })
 
       eventBus.broadcast('task.blocked', { taskId, number: task.number, blockReason: event.message })
+      notify(buildTaskNotification('task.blocked', { id: taskId, number: task.number, title: task.title }, { blockReason: event.message })).catch(() => {})
       return
     }
 
@@ -138,10 +174,17 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
     const endNow = Date.now()
 
     if (result.success) {
+      // Store structured output
+      const outputResult = result.result ? JSON.stringify({
+        summary: result.summary,
+        data: result.result,
+      }) : null
+
       await db.update(tasks).set({
         status: 'done' as const,
         summary: result.summary,
         result: result.result || null,
+        outputResult,
         totalInputTokens: result.totalInputTokens || 0,
         totalOutputTokens: result.totalOutputTokens || 0,
         totalCostCents: result.costCents || 0,
@@ -157,24 +200,50 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
       })
 
       eventBus.broadcast('task.completed', { taskId, number: task.number, summary: result.summary })
+      notify(buildTaskNotification('task.completed', { id: taskId, number: task.number, title: task.title }, { summary: result.summary })).catch(() => {})
     } else {
-      await db.update(tasks).set({
-        status: 'failed' as const,
-        failReason: result.error || 'Unknown error',
-        totalInputTokens: result.totalInputTokens || 0,
-        totalOutputTokens: result.totalOutputTokens || 0,
-        totalCostCents: result.costCents || 0,
-        updatedAt: endNow,
-      }).where(eq(tasks.id, taskId))
+      // Retry logic
+      const retryCount = (task.retryCount || 0) + 1
+      const maxRetries = task.maxRetries || 0
 
-      await writeActivityLog(taskId, {
-        action: 'task.failed',
-        actorType: 'agent',
-        actorId: agent.name,
-        message: result.error || 'Task failed',
-      })
+      if (maxRetries > 0 && retryCount <= maxRetries) {
+        // Re-queue for retry
+        await db.update(tasks).set({
+          status: 'open' as const,
+          retryCount,
+          failReason: `Retry ${retryCount}/${maxRetries}: ${result.error || 'Unknown error'}`,
+          updatedAt: endNow,
+          startedAt: null,
+        }).where(eq(tasks.id, taskId))
 
-      eventBus.broadcast('task.failed', { taskId, number: task.number, error: result.error })
+        await writeActivityLog(taskId, {
+          action: 'task.retry',
+          actorType: 'system',
+          message: `Retrying (${retryCount}/${maxRetries}): ${result.error}`,
+        })
+
+        eventBus.broadcast('task.progress', { taskId, number: task.number, event: { type: 'retry', message: `Retry ${retryCount}/${maxRetries}` } })
+      } else {
+        await db.update(tasks).set({
+          status: 'failed' as const,
+          failReason: result.error || 'Unknown error',
+          retryCount,
+          totalInputTokens: result.totalInputTokens || 0,
+          totalOutputTokens: result.totalOutputTokens || 0,
+          totalCostCents: result.costCents || 0,
+          updatedAt: endNow,
+        }).where(eq(tasks.id, taskId))
+
+        await writeActivityLog(taskId, {
+          action: 'task.failed',
+          actorType: 'agent',
+          actorId: agent.name,
+          message: result.error || 'Task failed',
+        })
+
+        eventBus.broadcast('task.failed', { taskId, number: task.number, error: result.error })
+        notify(buildTaskNotification('task.failed', { id: taskId, number: task.number, title: task.title }, { error: result.error })).catch(() => {})
+      }
     }
 
     // Handle recurring tasks
@@ -206,6 +275,10 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
 
     eventBus.broadcast('task.failed', { taskId, number: task.number, error: err.message })
   } finally {
+    // Release concurrency lock
+    if (task.concurrencyKey) {
+      release(task.concurrencyKey, task.id)
+    }
     // Reset agent status
     await db.update(agentsTable).set({ status: 'online' as const }).where(eq(agentsTable.id, agent.id))
   }

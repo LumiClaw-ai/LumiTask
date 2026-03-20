@@ -1,8 +1,8 @@
-# ClawTask 产品重新思考（终版）
+# LumiTask 产品重新思考（终版）
 
 ## 核心定位
 
-> **ClawTask：你的 AI agent 在做什么，一目了然。**
+> **LumiTask：你的 AI agent 在做什么，一目了然。**
 > 不是让你管理任务，而是让你看到 agent 的工作状态和结果。
 
 ## 从"任务看板"到"Agent 活动中心"
@@ -18,7 +18,7 @@
 
 ## 用户场景抽象
 
-| 场景 | 占比 | 在 OpenClaw 中 | ClawTask 做什么 |
+| 场景 | 占比 | 在 OpenClaw 中 | LumiTask 做什么 |
 |------|------|---------------|----------------|
 | **即时对话** | 80% | 直接完成 | 不介入 |
 | **长任务** | 10% | agent 执行 1-5 分钟 | **观察 session → 实时显示进度和结果** |
@@ -32,7 +32,7 @@
 
 ### 不再依赖 agent 手动调 CLI 记录
 
-之前的方案：旺财执行完后调 `clawtask create --status done` 登记结果。
+之前的方案：旺财执行完后调 `lumitask create --status done` 登记结果。
 **问题**：依赖 agent 主动配合，不可靠，且无法追踪执行过程。
 
 ### 新方案：直接读取 OpenClaw Session 文件
@@ -47,7 +47,7 @@ OpenClaw 的 session JSONL 文件实时写入每条消息：
 - toolResult（工具执行结果）
 - sessions_spawn（子 agent 派遣）
 
-ClawTask 轮询 tail 读取 → 解析 → 展示在 Now 面板
+LumiTask 轮询 tail 读取 → 解析 → 展示在 Now 面板
 ```
 
 **优势**：
@@ -63,7 +63,7 @@ ClawTask 轮询 tail 读取 → 解析 → 展示在 Now 面板
   2. 对比上次快照 → 找出 updatedAt 变化的 session
   3. 变化的 session → tail 读取 JSONL 最后 N 行
   4. 解析新消息 → 判断是否是"长任务"
-  5. 长任务 → 写入 ClawTask DB + 推送 SSE 到前端
+  5. 长任务 → 写入 LumiTask DB + 推送 SSE 到前端
 ```
 
 ### 长任务自动识别
@@ -74,7 +74,7 @@ ClawTask 轮询 tail 读取 → 解析 → 展示在 Now 面板
 规则 1: agent 调用了 > 3 个工具 → 可能是长任务
 规则 2: 对话持续 > 30 秒还没结束 → 长任务
 规则 3: agent 调用了 sessions_spawn → 多 agent 协作任务
-规则 4: agent 调用了 clawtask create → 用户主动要求记录
+规则 4: agent 调用了 lumitask create → 用户主动要求记录
 
 满足任一规则 → 在 Now 面板的 Active 区域显示
 ```
@@ -94,7 +94,7 @@ session updatedAt 30 秒内没变化，但还在执行中：
 
 ```
 主 agent 调用 sessions_spawn:
-  → ClawTask 检测到新的子 session
+  → LumiTask 检测到新的子 session
   → 在 Now 面板显示:
     📋 旺财: 整理社交媒体内容
       └─ 🧵 lumi-xhs: 处理小红书内容
@@ -103,11 +103,11 @@ session updatedAt 30 秒内没变化，但还在执行中：
 
 ---
 
-## 调度方式建议：OpenClaw Cron vs ClawTask 内部调度
+## 调度方式建议：OpenClaw Cron vs LumiTask 内部调度
 
-### 结论：用 OpenClaw Cron 管理，ClawTask 只做展示
+### 结论：用 OpenClaw Cron 管理，LumiTask 只做展示
 
-| 维度 | OpenClaw Cron | ClawTask 内部调度 |
+| 维度 | OpenClaw Cron | LumiTask 内部调度 |
 |------|--------------|------------------|
 | 执行引擎 | ✅ Gateway 原生，成熟稳定 | ❌ 要自己造，不可靠 |
 | Agent 执行 | ✅ 直接在 session 中执行 | ❌ 要通过 adapter 间接调用 |
@@ -115,21 +115,21 @@ session updatedAt 30 秒内没变化，但还在执行中：
 | 会话上下文 | ✅ 在同一个 session 中，有历史 | ❌ 每次是独立的，无上下文 |
 | 失败重试 | ✅ Gateway 内置 | ❌ 要自己写 |
 | 子 agent | ✅ 原生支持 sessions_spawn | ❌ 支持不了 |
-| 管理 UI | ❌ 只有 CLI | ✅ ClawTask 提供可视化管理 |
+| 管理 UI | ❌ 只有 CLI | ✅ LumiTask 提供可视化管理 |
 
 **分工**：
 - **OpenClaw Cron** = 执行引擎（创建、调度、执行、通知）
-- **ClawTask** = 管理面板（展示、编辑、启停、查看历史）
+- **LumiTask** = 管理面板（展示、编辑、启停、查看历史）
 
 **具体来说**：
 - 用户说"每天帮我检查 PR" → 旺财调 `openclaw cron add` 创建 cron job
-- ClawTask 读取 `openclaw cron list --json` 展示任务列表
-- 用户在 ClawTask 点"编辑" → 调 `openclaw cron edit` 修改
-- Cron 执行时 → session 文件有记录 → ClawTask 观察到执行过程和结果
-- 不需要 ClawTask 自己去调度执行
+- LumiTask 读取 `openclaw cron list --json` 展示任务列表
+- 用户在 LumiTask 点"编辑" → 调 `openclaw cron edit` 修改
+- Cron 执行时 → session 文件有记录 → LumiTask 观察到执行过程和结果
+- 不需要 LumiTask 自己去调度执行
 
-**ClawTask 的 Task Scheduler 保留的场景**：
-- Claude Code 任务（只能通过 ClawTask adapter 执行）
+**LumiTask 的 Task Scheduler 保留的场景**：
+- Claude Code 任务（只能通过 LumiTask adapter 执行）
 - 用户在 Web 面板手动创建的 immediate 任务
 
 ---
@@ -205,7 +205,7 @@ session updatedAt 30 秒内没变化，但还在执行中：
 
 ### Active 区域数据来源
 
-**方式 1: ClawTask 自有任务**（Claude Code adapter 执行的）
+**方式 1: LumiTask 自有任务**（Claude Code adapter 执行的）
 - 从 DB 读取 status=running 的任务
 - 活动日志来自 adapter 的 onEvent 回调
 
@@ -215,8 +215,8 @@ session updatedAt 30 秒内没变化，但还在执行中：
 - 自动识别长任务并显示在 Active 区域
 - 不创建 DB 记录，只做实时展示
 
-**方式 2 是关键创新**：用户在聊天中让旺财做长任务，不需要调 `clawtask`，
-ClawTask 自动观察 session 文件就能在 Now 面板显示进度。
+**方式 2 是关键创新**：用户在聊天中让旺财做长任务，不需要调 `lumitask`，
+LumiTask 自动观察 session 文件就能在 Now 面板显示进度。
 
 ### Agent 实时状态
 
@@ -281,10 +281,10 @@ ClawTask 自动观察 session 文件就能在 Now 面板显示进度。
 └──────────────────────────────────────────────────┘
 ```
 
-后端通过 `openclaw cron` CLI 操作（ClawTask 只是管理 UI）。
+后端通过 `openclaw cron` CLI 操作（LumiTask 只是管理 UI）。
 
 **Routines + Now 的结合**：
-- Cron 执行时 → 创建新 session → ClawTask 通过 session 观察检测到
+- Cron 执行时 → 创建新 session → LumiTask 通过 session 观察检测到
 - 自动出现在 Now 的 Active 区域（显示执行进度）
 - 完成后出现在 Just Completed
 
@@ -298,19 +298,19 @@ ClawTask 自动观察 session 文件就能在 Now 面板显示进度。
 
 ---
 
-## 什么时候创建 ClawTask 任务
+## 什么时候创建 LumiTask 任务
 
 | 触发方式 | 谁触发 | 任务状态 | 执行方式 |
 |---------|--------|---------|---------|
-| 用户说"帮我做X" | 聊天自动 | **不创建 DB 记录** | OpenClaw 直接执行，ClawTask 观察 session |
-| 用户说"帮我做X，记到任务" | 旺财调 CLI | open → immediate | ClawTask adapter 执行 |
+| 用户说"帮我做X" | 聊天自动 | **不创建 DB 记录** | OpenClaw 直接执行，LumiTask 观察 session |
+| 用户说"帮我做X，记到任务" | 旺财调 CLI | open → immediate | LumiTask adapter 执行 |
 | 用户说"记一下X" | 旺财调 CLI | inbox | 不执行 |
-| 用户 Web 面板创建 | 用户手动 | open/immediate | ClawTask adapter 执行 |
-| 定时任务 | OpenClaw Cron | **不创建 DB 记录** | OpenClaw 执行，ClawTask 观察 session |
+| 用户 Web 面板创建 | 用户手动 | open/immediate | LumiTask adapter 执行 |
+| 定时任务 | OpenClaw Cron | **不创建 DB 记录** | OpenClaw 执行，LumiTask 观察 session |
 | 用户说"每天做X" | 旺财调 cron add | **不创建 DB 记录** | OpenClaw Cron 执行 |
 
 **核心区分**：
-- **需要 ClawTask 管理的** → 创建 DB 记录（inbox、手动创建、用户明确要求记录的）
+- **需要 LumiTask 管理的** → 创建 DB 记录（inbox、手动创建、用户明确要求记录的）
 - **只需要看到的** → 不创建 DB 记录，通过 session 观察实时展示
 
 ---
@@ -332,7 +332,7 @@ Session 文件        Cron CLI
     │                  │
     ▼                  ▼
 ┌──────────────────────────────────┐
-│      ClawTask (Activity Center)   │
+│      LumiTask (Activity Center)   │
 │                                   │
 │  Session Observer (轮询 + tail)   │
 │    → Now 面板: Active + Completed │

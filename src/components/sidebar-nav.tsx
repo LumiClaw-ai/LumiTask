@@ -86,7 +86,7 @@ export function MobileNav() {
           <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setOpen(false)} />
           <aside className="fixed inset-y-0 left-0 z-50 w-56 bg-zinc-900 border-r border-zinc-800 flex flex-col">
             <div className="flex items-center justify-between px-5 py-5">
-              <h1 className="text-lg font-bold tracking-tight text-zinc-100">ClawTask</h1>
+              <h1 className="text-lg font-bold tracking-tight text-zinc-100">LumiTask</h1>
               <button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-zinc-100 cursor-pointer">
                 <X className="h-5 w-5" />
               </button>

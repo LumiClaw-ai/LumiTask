@@ -1,4 +1,4 @@
-# ClawTask 优化方案 — 对标 Paperclip 实现
+# LumiTask 优化方案 — 对标 Paperclip 实现
 
 ## 问题根因
 
@@ -25,7 +25,7 @@ SSE 不工作 + 没有 fallback 轮询 + 没有自动滚动。
 - 重连后 suppress toast 防噪
 - 按 event.type 做精确的 React Query invalidation
 
-**ClawTask 简化方案**（用 SSE 代替 WebSocket）：
+**LumiTask 简化方案**（用 SSE 代替 WebSocket）：
 
 ```typescript
 // src/lib/events.ts — 修改 broadcast 为无名事件
@@ -114,7 +114,7 @@ function useSSE() {
 - Comments tab 内嵌 `LiveRunWidget`（实时执行日志）
 - 可折叠区域：Linked Approvals、Cost Summary
 
-**ClawTask 的对标实现**：
+**LumiTask 的对标实现**：
 
 ```
 ┌──────────────────────────────────────┐
@@ -140,7 +140,7 @@ function useSSE() {
 - 可选 reassign（发评论同时改 agent）
 - 如果 issue 已关闭，可选 "Re-open" checkbox
 
-**ClawTask 的 Comments Tab**：
+**LumiTask 的 Comments Tab**：
 
 ```
 Timeline:
@@ -179,7 +179,7 @@ Timeline:
 - Max 80 条，FIFO
 - Fallback 轮询：每 2s 读取一次持久化日志
 
-**ClawTask 的 Logs Tab**：
+**LumiTask 的 Logs Tab**：
 
 ```typescript
 // 紧凑终端风格
@@ -368,7 +368,7 @@ blocked 状态时，评论输入框变为高亮：
 
 已选择状态:
 ┌──────────────────────────────────────┐
-│ 📁 /Users/cheche/workspace/clawtask  │ ← 点击重新选择
+│ 📁 /Users/cheche/workspace/lumitask  │ ← 点击重新选择
 │    ✕ 清除                            │
 └──────────────────────────────────────┘
 ```

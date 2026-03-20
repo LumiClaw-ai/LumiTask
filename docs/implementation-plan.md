@@ -1,4 +1,4 @@
-# ClawTask — 轻量级 Agent 任务协同中枢
+# LumiTask — 轻量级 Agent 任务协同中枢
 
 ## 核心定位
 
@@ -6,7 +6,7 @@
 
 **关键原则**：
 - **开源项目**，无登录、无多租户，本地直接使用
-- **聊天驱动**：大部分对话是即时完成的，只有用户明确说"记录到任务"时才写入 ClawTask
+- **聊天驱动**：大部分对话是即时完成的，只有用户明确说"记录到任务"时才写入 LumiTask
 - **Agent 自治**：agent 定期巡检任务池，根据自身能力理解自动认领未分配的任务
 - **单层任务**：不做子任务，agent 领到任务后自行规划执行，卡住则改状态通知用户决策
 - **CLI 优先**：提供 CLI 工具让 agent 高效操作任务（创建/查询/认领/回写）
@@ -37,13 +37,13 @@
 ```
 用户跟 OpenClaw agent 对话
      ↓
-大部分任务即时完成，不经过 ClawTask
+大部分任务即时完成，不经过 LumiTask
      ↓
 用户说："把这个记录到任务管理" / "这个任务记一下"
      ↓
-Agent 调用 CLI: clawtask create --title "..." --description "..."
+Agent 调用 CLI: lumitask create --title "..." --description "..."
      ↓
-任务进入 ClawTask 任务池 (status: open)
+任务进入 LumiTask 任务池 (status: open)
 ```
 
 ### 模式 2：面板创建（辅助模式）
@@ -61,25 +61,25 @@ Agent 调用 CLI: clawtask create --title "..." --description "..."
 ```
 OpenClaw agent 定期（cron）执行巡检
      ↓
-clawtask list --status open --unassigned
+lumitask list --status open --unassigned
      ↓
 Agent 根据任务内容 + 自身对各 agent 的理解，决定分配
      ↓
-clawtask assign <task-id> --agent <agent-name>
+lumitask assign <task-id> --agent <agent-name>
      ↓
 被分配的 agent 收到任务，开始执行
      ↓
 执行过程中通过 CLI 写入活动日志：
-  clawtask log <task-id> "正在抓取数据..."
-  clawtask log <task-id> "数据处理完成，生成报告中..."
+  lumitask log <task-id> "正在抓取数据..."
+  lumitask log <task-id> "数据处理完成，生成报告中..."
      ↓
 完成后回写结果：
-  clawtask complete <task-id> --summary "结果摘要" --result "详细内容"
+  lumitask complete <task-id> --summary "结果摘要" --result "详细内容"
      ↓
 系统通过聊天渠道通知用户：任务 #12 已完成
      ↓
 卡住时：
-  clawtask block <task-id> --reason "需要用户提供 API key"
+  lumitask block <task-id> --reason "需要用户提供 API key"
      ↓
 系统通知用户，用户决策后手动解除或在聊天中指示
 ```
@@ -226,28 +226,28 @@ open ──────→ assigned ──→ running ──→ done
 
 ## CLI 设计（核心交互方式）
 
-Agent 通过 CLI 操作 ClawTask，比 API 更直观高效。CLI 调用 ClawTask 的 REST API。
+Agent 通过 CLI 操作 LumiTask，比 API 更直观高效。CLI 调用 LumiTask 的 REST API。
 
 ```bash
 # === 任务管理 ===
 
 # 创建任务
-clawtask create --title "整理本周AI新闻" --description "..." --priority high
+lumitask create --title "整理本周AI新闻" --description "..." --priority high
 # → Task #12 created (status: open)
 
 # 创建任务并指定 agent
-clawtask create --title "写推文" --assign social-growth --priority medium
+lumitask create --title "写推文" --assign social-growth --priority medium
 # → Task #13 created, assigned to social-growth
 
 # 列出任务
-clawtask list                              # 所有非终态任务
-clawtask list --status open                # 待认领
-clawtask list --status open --unassigned   # 未分配的
-clawtask list --agent social-growth        # 某 agent 的任务
-clawtask list --status running             # 执行中的
+lumitask list                              # 所有非终态任务
+lumitask list --status open                # 待认领
+lumitask list --status open --unassigned   # 未分配的
+lumitask list --agent social-growth        # 某 agent 的任务
+lumitask list --status running             # 执行中的
 
 # 查看任务详情（含活动日志）
-clawtask show 12
+lumitask show 12
 # → Task #12: 整理本周AI新闻
 #   Status: running | Agent: researcher | Priority: high
 #   Tokens: 12,450 in / 3,280 out (~$0.08)
@@ -263,50 +263,50 @@ clawtask show 12
 # === Agent 执行操作 ===
 
 # 认领任务
-clawtask assign 12 --agent researcher
+lumitask assign 12 --agent researcher
 
 # 开始执行
-clawtask start 12
+lumitask start 12
 
 # 汇报进展（写入活动日志，任务详情页实时可见）
-clawtask log 12 "已找到15篇相关文章，正在筛选..." \
+lumitask log 12 "已找到15篇相关文章，正在筛选..." \
   --tokens-in 1200 --tokens-out 350 --model claude-sonnet-4-20250514
-clawtask log 12 "筛选完成，开始撰写摘要..."
+lumitask log 12 "筛选完成，开始撰写摘要..."
 
 # 完成任务
-clawtask complete 12 --summary "整理了10篇AI新闻摘要" --result "1. OpenAI发布..."
+lumitask complete 12 --summary "整理了10篇AI新闻摘要" --result "1. OpenAI发布..."
 # → Task #12 completed. Notifying user via telegram.
 
 # 标记卡住
-clawtask block 12 --reason "需要用户提供 Perplexity API key"
+lumitask block 12 --reason "需要用户提供 Perplexity API key"
 # → Task #12 blocked. Notifying user via telegram.
 
 # 解除阻塞
-clawtask unblock 12
+lumitask unblock 12
 
 # 标记失败
-clawtask fail 12 --reason "API 超时无法访问"
+lumitask fail 12 --reason "API 超时无法访问"
 
 # 重新打开（重试）
-clawtask reopen 12
+lumitask reopen 12
 
 # === Agent 注册 ===
 
 # 注册 agent
-clawtask agent register --name social-growth --display "社媒增长" \
+lumitask agent register --name social-growth --display "社媒增长" \
   --capabilities research,content,seo \
   --description "负责社交媒体内容创作和增长策略"
 
 # 列出 agent
-clawtask agent list
+lumitask agent list
 
 # Agent 签到（巡检时调用，更新 lastSeenAt）
-clawtask agent checkin --name orchestrator
+lumitask agent checkin --name orchestrator
 
 # === 添加产物 ===
 
-clawtask artifact 12 --type file --name "report.md" --content ./output/report.md
-clawtask artifact 12 --type url --name "推文链接" --content "https://x.com/..."
+lumitask artifact 12 --type file --name "report.md" --content ./output/report.md
+lumitask artifact 12 --type url --name "推文链接" --content "https://x.com/..."
 ```
 
 ---
@@ -315,11 +315,11 @@ clawtask artifact 12 --type url --name "推文链接" --content "https://x.com/.
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
-│                           ClawTask                                 │
+│                           LumiTask                                 │
 │                                                                    │
 │  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌───────────────┐  │
 │  │  Web UI   │  │ REST API   │  │   CLI    │  │ OpenClaw      │  │
-│  │  (Next.js)│  │ /api/*     │  │ clawtask │  │ Plugin/Skill  │  │
+│  │  (Next.js)│  │ /api/*     │  │ lumitask │  │ Plugin/Skill  │  │
 │  │           │  │            │  │          │  │               │  │
 │  │  - 看板   ←SSE┤            │←HTTP─┘          │  agent 调用   │  │
 │  │  - 任务   │  │            │                  │  CLI 操作任务 │  │
@@ -343,10 +343,10 @@ clawtask artifact 12 --type url --name "推文链接" --content "https://x.com/.
                     │                         │
                     ▼                         ▼
             即时完成（大部分）         "记到任务管理"
-            不经过 ClawTask               │
+            不经过 LumiTask               │
                                           ▼
                                  Agent 调 CLI 创建任务
-                                    clawtask create
+                                    lumitask create
                                           │
                     ┌─────── 或 ──────────┤
                     ▼                      ▼
@@ -355,21 +355,21 @@ clawtask artifact 12 --type url --name "推文链接" --content "https://x.com/.
                     └──────────┬───────────┘
                                ▼
                     Orchestrator Agent (cron 定期巡检)
-                    clawtask list --status open --unassigned
+                    lumitask list --status open --unassigned
                                │
                      根据任务内容 + agent 能力理解
                                │
-                     clawtask assign <id> --agent <name>
+                     lumitask assign <id> --agent <name>
                                │
                                ▼
                      被分配 Agent 开始执行
-                     clawtask start <id>
-                     clawtask log <id> "进展..."
+                     lumitask start <id>
+                     lumitask log <id> "进展..."
                                │
                     ┌──────────┼──────────┐
                     ▼          ▼          ▼
                   完成       卡住       失败
-              clawtask    clawtask    clawtask
+              lumitask    lumitask    lumitask
               complete    block       fail
                   │          │          │
                   ▼          ▼          ▼
@@ -383,31 +383,31 @@ clawtask artifact 12 --type url --name "推文链接" --content "https://x.com/.
 
 ### 方式 1：注册为 OpenClaw Skill（推荐）
 
-把 ClawTask CLI 命令注册为 OpenClaw 的 skill，这样 agent 在对话中可以直接使用：
+把 LumiTask CLI 命令注册为 OpenClaw 的 skill，这样 agent 在对话中可以直接使用：
 
 ```markdown
-# skills/clawtask.md
+# skills/lumitask.md
 ---
-name: clawtask
+name: lumitask
 description: 管理任务的技能，可以创建、查询、认领、完成任务
 tools:
-  - shell: clawtask create --title "$title" --description "$description"
-  - shell: clawtask list $filters
-  - shell: clawtask show $taskNumber
-  - shell: clawtask assign $taskNumber --agent $agentName
-  - shell: clawtask complete $taskNumber --summary "$summary"
-  - shell: clawtask log $taskNumber "$message"
-  - shell: clawtask block $taskNumber --reason "$reason"
+  - shell: lumitask create --title "$title" --description "$description"
+  - shell: lumitask list $filters
+  - shell: lumitask show $taskNumber
+  - shell: lumitask assign $taskNumber --agent $agentName
+  - shell: lumitask complete $taskNumber --summary "$summary"
+  - shell: lumitask log $taskNumber "$message"
+  - shell: lumitask block $taskNumber --reason "$reason"
 ---
 
 当用户说"记到任务"、"这个任务记一下"、"帮我创建个任务"时，
-使用 clawtask create 创建任务。
+使用 lumitask create 创建任务。
 
-当被分配任务时，先 clawtask start，然后执行，
-过程中用 clawtask log 汇报进展，
-完成后用 clawtask complete 回写结果。
+当被分配任务时，先 lumitask start，然后执行，
+过程中用 lumitask log 汇报进展，
+完成后用 lumitask complete 回写结果。
 
-卡住时用 clawtask block 通知用户。
+卡住时用 lumitask block 通知用户。
 ```
 
 ### 方式 2：Cron 巡检任务
@@ -418,13 +418,13 @@ tools:
 {
   "cron": {
     "jobs": [{
-      "id": "clawtask-patrol",
-      "name": "巡检 ClawTask 任务池",
+      "id": "lumitask-patrol",
+      "name": "巡检 LumiTask 任务池",
       "schedule": "*/10 * * * *",
       "agentId": "orchestrator",
       "payload": {
         "kind": "agentTurn",
-        "message": "请检查 ClawTask 中未分配的任务：运行 clawtask list --status open --unassigned，根据你对各 agent 能力的了解，分配合适的 agent。"
+        "message": "请检查 LumiTask 中未分配的任务：运行 lumitask list --status open --unassigned，根据你对各 agent 能力的了解，分配合适的 agent。"
       }
     }]
   }
@@ -433,7 +433,7 @@ tools:
 
 ### 方式 3：完成后通过聊天通知用户
 
-Agent 完成任务后，ClawTask 通过 OpenClaw 的 `deliver` 机制把结果发到用户的聊天渠道：
+Agent 完成任务后，LumiTask 通过 OpenClaw 的 `deliver` 机制把结果发到用户的聊天渠道：
 
 ```typescript
 // 任务完成时，调用 OpenClaw Gateway 发送通知
@@ -451,7 +451,7 @@ await openclawConnector.createAgentRun({
 ## 项目结构
 
 ```
-clawtask/
+lumitask/
 ├── src/
 │   ├── app/                          # Next.js App Router
 │   │   ├── layout.tsx                # 根布局（侧边栏 + 主内容）
@@ -617,7 +617,7 @@ clawtask/
 └──────────────────────────────────────────┘
 ```
 
-**活动日志实时更新**：通过 SSE 订阅，agent 每次 `clawtask log` 都即时显示在时间线上。
+**活动日志实时更新**：通过 SSE 订阅，agent 每次 `lumitask log` 都即时显示在时间线上。
 
 ### 3. Agent 管理 (`/agents`)
 
@@ -638,7 +638,7 @@ clawtask/
 
 ```
 用户: "帮我写一篇推文 @social-growth，记到任务"
-→ clawtask create --title "写推文" --assign social-growth
+→ lumitask create --title "写推文" --assign social-growth
 ```
 
 ### 自动分配（Orchestrator Agent）
@@ -647,10 +647,10 @@ clawtask/
 
 ```
 Orchestrator 的决策逻辑（在 agent prompt 中定义）：
-1. clawtask list --status open --unassigned
-2. clawtask agent list  （查看所有 agent 及其能力描述）
+1. lumitask list --status open --unassigned
+2. lumitask agent list  （查看所有 agent 及其能力描述）
 3. 根据任务内容理解 + agent 能力描述，做出分配决策
-4. clawtask assign <id> --agent <name>
+4. lumitask assign <id> --agent <name>
 
 这里不写死匹配规则，而是让 orchestrator agent 用自然语言理解来匹配。
 好处：不需要维护能力矩阵，agent 的 description 写清楚就行。
@@ -663,19 +663,19 @@ Orchestrator 的决策逻辑（在 agent prompt 中定义）：
 ```env
 # .env.example
 
-# ClawTask Server
-CLAWTASK_PORT=3000
-CLAWTASK_HOST=127.0.0.1
+# LumiTask Server
+LUMITASK_PORT=3000
+LUMITASK_HOST=127.0.0.1
 
 # Database
-DATABASE_URL=file:./data/clawtask.db
+DATABASE_URL=file:./data/lumitask.db
 
 # OpenClaw Gateway（用于通知用户）
 OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
 OPENCLAW_GATEWAY_TOKEN=your-gateway-token
 
 # CLI 配置（agent 使用时需要知道 server 地址）
-CLAWTASK_API_URL=http://127.0.0.1:3000/api
+LUMITASK_API_URL=http://127.0.0.1:3000/api
 ```
 
 ---
@@ -695,10 +695,10 @@ CLAWTASK_API_URL=http://127.0.0.1:3000/api
 
 ### Phase 2：OpenClaw 集成
 
-7. **OpenClaw Skill**：注册 clawtask CLI 为 skill，agent 在对话中可用
+7. **OpenClaw Skill**：注册 lumitask CLI 为 skill，agent 在对话中可用
 8. **Cron 巡检**：orchestrator agent 定期检查未分配任务
 9. **完成通知**：任务完成/卡住时通过 OpenClaw deliver 发送聊天通知
-10. **Agent 注册**：agent 首次巡检时自动注册到 ClawTask
+10. **Agent 注册**：agent 首次巡检时自动注册到 LumiTask
 
 **Phase 2 验证目标**：用户聊天说"记到任务" → agent 自动调 CLI 创建 → orchestrator 巡检分配 → agent 执行回写 → 用户在聊天收到结果通知
 

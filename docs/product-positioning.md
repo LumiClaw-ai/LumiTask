@@ -1,14 +1,14 @@
-# ClawTask 产品定位（终版）
+# LumiTask 产品定位（终版）
 
 ## 核心定位
 
-> **ClawTask = OpenClaw 的任务管理面板**
+> **LumiTask = OpenClaw 的任务管理面板**
 > 只管理用户**明确要求记录**的任务，不自动收集。
-> OpenClaw 是引擎，ClawTask 是仪表盘。
+> OpenClaw 是引擎，LumiTask 是仪表盘。
 
-## 什么进 ClawTask
+## 什么进 LumiTask
 
-| 进 ClawTask | 不进 ClawTask |
+| 进 LumiTask | 不进 LumiTask |
 |-------------|---------------|
 | 用户说"记到任务/创建任务/添加待办" | 即时对话（翻译、问答、改文案） |
 | 用户说"每天帮我做X"（定时任务） | 长任务（除非用户明确说记录） |
@@ -127,10 +127,10 @@ Settings 配置：
    是否需要安排执行？查看: http://localhost:3000/inbox"
 ```
 
-**初始化引导**：首次打开 ClawTask 时弹出配置向导：
+**初始化引导**：首次打开 LumiTask 时弹出配置向导：
 ```
 ┌──────────────────────────────────┐
-│  欢迎使用 ClawTask 👋            │
+│  欢迎使用 LumiTask 👋            │
 │                                   │
 │  1/2 选择默认 Agent               │
 │  [🐶 旺财 (OpenClaw) ▼]          │
@@ -173,8 +173,8 @@ Settings 配置：
 - **删除**：标记为 `cancelled`
 
 当用户在 OpenClaw 聊天中处理了某个收集箱项目：
-- 旺财执行后调 `clawtask complete <编号>` → 状态从 inbox 变为 done
-- ClawTask 界面实时同步
+- 旺财执行后调 `lumitask complete <编号>` → 状态从 inbox 变为 done
+- LumiTask 界面实时同步
 
 ### 🔄 定时任务（OpenClaw Cron）
 
@@ -233,7 +233,7 @@ openclaw cron add \
   --cron "0 9 */3 * *" \
   --agent main \
   --announce \
-  --message "请检查 ClawTask 收集箱：运行 clawtask list --status inbox 查看待处理项目，汇总后告诉用户。"
+  --message "请检查 LumiTask 收集箱：运行 lumitask list --status inbox 查看待处理项目，汇总后告诉用户。"
 ```
 
 ## 实施优先级

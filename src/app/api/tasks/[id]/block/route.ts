@@ -14,9 +14,21 @@ export async function POST(
     const body = await request.json();
     const now = Date.now();
 
+    // Support structured decision requests
+    // body.reason can be a plain string (backward compatible)
+    // body.decision can be a structured DecisionRequest:
+    //   { type: 'confirm'|'choose'|'input'|'approve', question, options?, defaultOption?, context? }
+    let blockReason: string;
+    if (body.decision) {
+      // Store structured decision as JSON in blockReason
+      blockReason = JSON.stringify(body.decision);
+    } else {
+      blockReason = body.reason || "Needs human input";
+    }
+
     await db
       .update(tasks)
-      .set({ status: "blocked", blockReason: body.reason, updatedAt: now })
+      .set({ status: "blocked", blockReason, updatedAt: now })
       .where(eq(tasks.id, id));
 
     const [updated] = await db.select().from(tasks).where(eq(tasks.id, id));
@@ -29,7 +41,7 @@ export async function POST(
       taskId: id,
       action: "task.blocked",
       actorType: "system",
-      message: body.reason,
+      message: body.decision?.question || body.reason,
       createdAt: now,
     });
 

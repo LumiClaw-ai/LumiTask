@@ -1,4 +1,4 @@
-# ClawTask Phase 2 — Agent 自动执行 + 调度
+# LumiTask Phase 2 — Agent 自动执行 + 调度
 
 ## 设计变更总结
 
@@ -686,7 +686,7 @@ FolderPicker 组件通过 HTTP 调用 `GET /api/files/browse`，服务端用 `fs
   current: '/Users/cheche/workspace',
   parent: '/Users/cheche',
   directories: [
-    { name: 'clawtask', path: '/Users/cheche/workspace/clawtask' },
+    { name: 'lumitask', path: '/Users/cheche/workspace/lumitask' },
     { name: 'lumiclaw', path: '/Users/cheche/workspace/lumiclaw' },
     ...
   ]
@@ -705,7 +705,7 @@ FolderPicker 组件通过 HTTP 调用 `GET /api/files/browse`，服务端用 `fs
 │  └──────────────────────────┘    │
 │  ↑ 上级目录                       │
 │  ┌──────────────────────────────┐│
-│  │ 📁 clawtask                  ││
+│  │ 📁 lumitask                  ││
 │  │ 📁 lumiclaw                  ││
 │  │ 📁 agent-research            ││
 │  │ 📁 test                      ││
@@ -815,7 +815,7 @@ FolderPicker 组件通过 HTTP 调用 `GET /api/files/browse`，服务端用 `fs
 
 ```
 ┌────────────────┐
-│  ClawTask       │
+│  LumiTask       │
 ├────────────────┤
 │  📋 Tasks       │
 │  🤖 Agents      │
@@ -883,7 +883,7 @@ FolderPicker 组件通过 HTTP 调用 `GET /api/files/browse`，服务端用 `fs
 
 ## 与 LumiClaw 的边界
 
-| 功能 | ClawTask (开源) | LumiClaw (商业) |
+| 功能 | LumiTask (开源) | LumiClaw (商业) |
 |------|----------------|----------------|
 | 任务层级 | 单层 Task | Goal → Plan → Task |
 | Agent 来源 | 自动检测本地 | Team Pack 模板安装 |

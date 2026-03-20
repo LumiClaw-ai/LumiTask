@@ -76,7 +76,7 @@ export default function TasksPage() {
   )
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between pr-4 sm:pr-6 py-3 sm:py-4 border-b border-zinc-800 bg-zinc-950 pl-12 lg:pl-6">
         <h2 className="text-lg font-semibold text-zinc-100">任务</h2>

@@ -30,7 +30,7 @@ export async function startServer(): Promise<void> {
   const env = {
     ...process.env,
     PORT: String(serverPort),
-    HOSTNAME: "127.0.0.1",
+    HOSTNAME: "0.0.0.0",
     NODE_ENV: "production",
   };
 

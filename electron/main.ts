@@ -1,11 +1,60 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, shell } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog } from "electron";
 import path from "path";
 import { startServer, stopServer, getServerUrl } from "./server";
+import { autoUpdater } from "electron-updater";
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 let badgeTimer: ReturnType<typeof setInterval> | null = null;
+
+// ============================================================
+// Auto Updater
+// ============================================================
+
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-available", (info) => {
+    console.log(`[Updater] New version available: ${info.version}`);
+    tray?.setToolTip(`LumiTask — Downloading update v${info.version}...`);
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    console.log(`[Updater] Update downloaded: ${info.version}`);
+    tray?.setToolTip("LumiTask");
+
+    // Show notification to user
+    const result = dialog.showMessageBoxSync(mainWindow!, {
+      type: "info",
+      title: "LumiTask 更新",
+      message: `新版本 v${info.version} 已下载完成`,
+      detail: "重启应用即可完成更新。",
+      buttons: ["立即重启", "稍后"],
+      defaultId: 0,
+    });
+
+    if (result === 0) {
+      isQuitting = true;
+      autoUpdater.quitAndInstall();
+    }
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.error("[Updater] Error:", err.message);
+  });
+
+  // Check for updates every 4 hours
+  autoUpdater.checkForUpdates().catch(() => {});
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 4 * 60 * 60 * 1000);
+}
+
+// ============================================================
+// Window
+// ============================================================
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -51,6 +100,10 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+// ============================================================
+// Tray
+// ============================================================
+
 function createTray(): void {
   const iconPath = path.join(__dirname, "icons", "tray-icon.png");
   let icon: Electron.NativeImage;
@@ -66,6 +119,7 @@ function createTray(): void {
 
   const contextMenu = Menu.buildFromTemplate([
     { label: "打开 Dashboard", click: () => mainWindow?.show() },
+    { label: "检查更新", click: () => autoUpdater.checkForUpdates().catch(() => {}) },
     { type: "separator" },
     { label: "退出", click: () => { isQuitting = true; app.quit(); } },
   ]);
@@ -73,6 +127,10 @@ function createTray(): void {
   tray.setContextMenu(contextMenu);
   tray.on("click", () => mainWindow?.show());
 }
+
+// ============================================================
+// Badge polling
+// ============================================================
 
 function startBadgePoller(): void {
   const poll = async () => {
@@ -95,12 +153,17 @@ function startBadgePoller(): void {
   badgeTimer = setInterval(poll, 10_000);
 }
 
+// ============================================================
+// App lifecycle
+// ============================================================
+
 app.on("ready", async () => {
   try {
     await startServer();
     mainWindow = createWindow();
     createTray();
     startBadgePoller();
+    setupAutoUpdater();
   } catch (err) {
     console.error("Failed to start:", err);
     app.quit();

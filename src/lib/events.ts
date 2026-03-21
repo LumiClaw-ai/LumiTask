@@ -2,8 +2,11 @@ type SseWriter = {
   write(data: string): void;
 };
 
+type InternalListener = (event: string, data: any) => void;
+
 class EventBus {
   private clients = new Set<SseWriter>();
+  private listeners: InternalListener[] = [];
 
   addClient(stream: SseWriter) {
     this.clients.add(stream);
@@ -11,6 +14,11 @@ class EventBus {
 
   removeClient(stream: SseWriter) {
     this.clients.delete(stream);
+  }
+
+  /** Register an internal listener (for scheduler, notifications, etc.) */
+  on(listener: InternalListener) {
+    this.listeners.push(listener);
   }
 
   broadcast(event: string, data: unknown) {
@@ -24,6 +32,11 @@ class EventBus {
       } catch {
         this.clients.delete(client);
       }
+    }
+
+    // Notify internal listeners
+    for (const listener of this.listeners) {
+      try { listener(event, obj); } catch {}
     }
   }
 }

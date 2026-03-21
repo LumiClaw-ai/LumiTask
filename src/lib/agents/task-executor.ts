@@ -224,7 +224,7 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
       })
 
       eventBus.broadcast('task.completed', { taskId, number: task.number, summary: result.summary })
-      notify(buildTaskNotification('task.completed', { id: taskId, number: task.number, title: task.title }, { summary: result.summary }), { sourceChannel: task.sourceChannel, sourceAccountId: task.sourceAccountId, sourceTarget: task.sourceTarget }).catch(() => {})
+      notify(buildTaskNotification('task.completed', { id: taskId, number: task.number, title: task.title }, { summary: result.summary, result: result.result }), { sourceChannel: task.sourceChannel, sourceAccountId: task.sourceAccountId, sourceTarget: task.sourceTarget }).catch(() => {})
     } else {
       // Retry logic
       const retryCount = (task.retryCount || 0) + 1

@@ -53,7 +53,7 @@ export async function notify(
 export function buildTaskNotification(
   event: string,
   task: { id: string; number: number; title: string },
-  extra?: { summary?: string; error?: string; blockReason?: string }
+  extra?: { summary?: string; result?: string; error?: string; blockReason?: string }
 ): NotificationPayload {
   const baseUrl = process.env.LUMITASK_URL || 'http://localhost:3179'
   const actionUrl = `${baseUrl}/tasks/${task.id}`
@@ -63,7 +63,7 @@ export function buildTaskNotification(
       return {
         event,
         title: `任务 #${task.number} 已完成`,
-        body: `${extra?.summary || task.title}`,
+        body: extra?.result || extra?.summary || task.title,
         level: 'info',
         taskId: task.id,
         taskNumber: task.number,

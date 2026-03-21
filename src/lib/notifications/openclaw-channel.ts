@@ -163,12 +163,12 @@ function buildTaskCard(payload: NotificationPayload): Record<string, unknown> {
     })),
   })
 
-  // Body content
+  // Body content — full result, no truncation (Feishu card auto-expands vertically)
   if (payload.body) {
     elements.push({ tag: 'hr' })
     elements.push({
       tag: 'div',
-      text: { tag: 'lark_md', content: payload.body.slice(0, 500) },
+      text: { tag: 'lark_md', content: payload.body },
     })
   }
 

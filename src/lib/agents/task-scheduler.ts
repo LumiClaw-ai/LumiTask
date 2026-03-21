@@ -1,9 +1,14 @@
-import { eq, and, lte, inArray, isNull, or } from 'drizzle-orm'
+import { eq, and, lte, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { tasks } from '@/lib/db/schema'
+import { tasks, agents } from '@/lib/db/schema'
 import { executeTask } from './task-executor'
 import { canAcquire, acquire } from './concurrency'
 import { eventBus } from '@/lib/events'
+
+// Per-agent max concurrent tasks
+// OpenClaw agents: 1 (single session at a time)
+// Claude Code: 1 (single process)
+const DEFAULT_MAX_CONCURRENT = 1
 
 let schedulerInterval: NodeJS.Timeout | null = null
 
@@ -63,6 +68,22 @@ async function tick() {
 
     if (candidates.length === 0) return
 
+    // Count currently running tasks per agent
+    const runningTasks = await db.select({
+      agentId: tasks.assigneeAgentId,
+      count: sql<number>`count(*)`,
+    }).from(tasks)
+      .where(eq(tasks.status, 'running'))
+      .groupBy(tasks.assigneeAgentId)
+
+    const runningPerAgent = new Map<string, number>()
+    for (const r of runningTasks) {
+      if (r.agentId) runningPerAgent.set(r.agentId, r.count)
+    }
+
+    // Track agents we dispatch to in this tick (to avoid over-dispatching)
+    const dispatchedThisTick = new Set<string>()
+
     // Build a status lookup map for dependency checking
     // Only fetch tasks that are referenced as dependencies
     const allDepIds = new Set<string>()
@@ -87,6 +108,13 @@ async function tick() {
 
     for (const task of candidates) {
       if (!task.assigneeAgentId) continue // Skip unassigned
+
+      // 0. Check per-agent concurrency limit
+      const agentId = task.assigneeAgentId
+      const currentRunning = (runningPerAgent.get(agentId) || 0) + (dispatchedThisTick.has(agentId) ? 1 : 0)
+      if (currentRunning >= DEFAULT_MAX_CONCURRENT) {
+        continue // Agent already at capacity
+      }
 
       // 1. Check dependencies
       const depStatus = checkDependencies(task.dependsOn, depStatusMap)
@@ -119,6 +147,7 @@ async function tick() {
       }
 
       console.log(`[Scheduler] Executing task #${task.number}: ${task.title}`)
+      dispatchedThisTick.add(agentId)
       executeTask(task.id).catch(err => {
         console.error(`[Scheduler] Failed to execute task #${task.number}:`, err.message)
       })

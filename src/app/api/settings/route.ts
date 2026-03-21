@@ -9,9 +9,13 @@ const DEFAULT_SETTINGS: Record<string, string> = {
 
 export async function GET() {
   try {
-    const settings: Record<string, string> = {};
-    for (const [key, defaultValue] of Object.entries(DEFAULT_SETTINGS)) {
-      settings[key] = getSetting(key, defaultValue);
+    // Start with defaults
+    const settings: Record<string, string> = { ...DEFAULT_SETTINGS };
+    // Override with all saved settings from DB
+    const { getAllSettings } = await import("@/lib/db");
+    const saved = getAllSettings();
+    for (const [key, value] of Object.entries(saved)) {
+      settings[key] = value;
     }
     return NextResponse.json(settings);
   } catch (error) {
@@ -29,6 +33,13 @@ export async function PATCH(request: NextRequest) {
       }
     } else if (body.key && body.value !== undefined) {
       setSetting(body.key, String(body.value));
+    } else {
+      // Flat format: { defaultAgentId: "xxx", ... }
+      for (const [key, value] of Object.entries(body)) {
+        if (typeof value === "string") {
+          setSetting(key, value);
+        }
+      }
     }
 
     // Return updated settings

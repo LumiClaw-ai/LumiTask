@@ -172,6 +172,15 @@ export function getSetting(key: string, defaultValue: string = ''): string {
   return result?.value ?? defaultValue;
 }
 
+export function getAllSettings(): Record<string, string> {
+  const rows = getDb().all<{ key: string; value: string }>(
+    sql`SELECT key, value FROM settings`
+  );
+  const result: Record<string, string> = {};
+  for (const row of rows) result[row.key] = row.value;
+  return result;
+}
+
 export function setSetting(key: string, value: string): void {
   getDb().run(
     sql`INSERT OR REPLACE INTO settings (key, value) VALUES (${key}, ${value})`

@@ -37,6 +37,7 @@ export const tasks = sqliteTable("tasks", {
   outputResult: text("output_result"), // JSON — structured output from agent
   // Concurrency & retry
   concurrencyKey: text("concurrency_key"),
+  sessionId: text("session_id"), // OpenClaw session ID for context continuity
   retryCount: integer("retry_count").default(0),
   maxRetries: integer("max_retries").default(0),
   // Results

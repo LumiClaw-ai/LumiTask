@@ -5,6 +5,7 @@ export interface TaskContext {
   description: string | null
   workingDirectory: string | null
   agentConfig?: string | null  // JSON string of agent's adapterConfig
+  sessionId?: string | null    // OpenClaw session ID for context continuity
 }
 
 export interface ExecutionEvent {
@@ -27,6 +28,7 @@ export interface ExecutionResult {
   totalOutputTokens: number
   costCents?: number
   model?: string
+  sessionId?: string  // The session ID used during execution
 }
 
 export interface AgentAdapter {

@@ -92,6 +92,28 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
     } catch {}
   }
 
+  // Resolve session ID for context continuity
+  let sessionId = task.sessionId || null
+
+  // If this task has a parent, inherit parent's session
+  if (!sessionId && task.parentTaskId) {
+    const [parent] = await db.select({ sessionId: tasks.sessionId })
+      .from(tasks).where(eq(tasks.id, task.parentTaskId))
+    if (parent?.sessionId) sessionId = parent.sessionId
+  }
+
+  // If this task depends on another, inherit the first dependency's session
+  if (!sessionId && task.dependsOn) {
+    try {
+      const depIds: string[] = JSON.parse(task.dependsOn)
+      if (depIds.length > 0) {
+        const [dep] = await db.select({ sessionId: tasks.sessionId })
+          .from(tasks).where(eq(tasks.id, depIds[0]))
+        if (dep?.sessionId) sessionId = dep.sessionId
+      }
+    } catch {}
+  }
+
   const context: TaskContext = {
     taskId,
     taskNumber: task.number,
@@ -99,6 +121,7 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
     description,
     workingDirectory: task.workingDirectory,
     agentConfig: agent.adapterConfig,
+    sessionId,
   }
 
   // Execute with event callback
@@ -185,6 +208,7 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
         summary: result.summary,
         result: result.result || null,
         outputResult,
+        sessionId: result.sessionId || sessionId || null,
         totalInputTokens: result.totalInputTokens || 0,
         totalOutputTokens: result.totalOutputTokens || 0,
         totalCostCents: result.costCents || 0,

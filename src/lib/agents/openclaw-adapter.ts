@@ -37,6 +37,11 @@ export class OpenClawAdapter implements AgentAdapter {
     return new Promise<ExecutionResult>((resolve, reject) => {
       // Use --json for structured output, --agent for specific agent
       const args = ['agent', '--agent', agentId, '--message', prompt, '--json']
+
+      // Session continuity: reuse session for subtasks, retries, replies
+      if (context.sessionId) {
+        args.push('--session-id', context.sessionId)
+      }
       const proc = spawn(binaryPath, args, {
         env: { ...process.env },
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -167,12 +172,24 @@ export class OpenClawAdapter implements AgentAdapter {
             } catch {}
           }
 
+          // Capture the session ID used for this execution
+          let executionSessionId: string | undefined
+          try {
+            const { readAllSessions } = require('@/lib/session-observer')
+            const sessions = readAllSessions().filter((s: any) => s.agentId === agentId)
+            if (sessions.length > 0) {
+              const latest = sessions.sort((a: any, b: any) => b.updatedAt - a.updatedAt)[0]
+              executionSessionId = latest.sessionId
+            }
+          } catch {}
+
           resolve({
             success: true,
             summary: (resultText || summary).slice(0, 500),
             result: resultText || summary,
             totalInputTokens: 0,
             totalOutputTokens: 0,
+            sessionId: executionSessionId,
           })
         } else {
           const errorMsg = resultText || stderr.trim() || `OpenClaw exited with code ${code}`

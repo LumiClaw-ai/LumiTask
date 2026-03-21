@@ -11,5 +11,9 @@ export async function register() {
       mkdirSync(join(homedir(), '.lumitask'), { recursive: true })
       writeFileSync(portFile, port)
     } catch {}
+
+    // Start task scheduler (dependency resolution, concurrency control, cron tasks)
+    const { startScheduler } = await import('@/lib/agents/task-scheduler')
+    startScheduler()
   }
 }

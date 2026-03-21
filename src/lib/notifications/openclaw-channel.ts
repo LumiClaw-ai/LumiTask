@@ -91,6 +91,28 @@ async function getTenantToken(accountId: string): Promise<string | null> {
   }
 }
 
+async function sendFeishuText(accountId: string, receiveId: string, text: string): Promise<boolean> {
+  const token = await getTenantToken(accountId)
+  if (!token) return false
+
+  try {
+    const res = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        receive_id: receiveId,
+        msg_type: 'text',
+        content: JSON.stringify({ text }),
+      }),
+    })
+    const data = await res.json()
+    return data.code === 0
+  } catch { return false }
+}
+
 async function sendFeishuCard(accountId: string, receiveId: string, card: Record<string, unknown>): Promise<boolean> {
   const token = await getTenantToken(accountId)
   if (!token) return false
@@ -271,15 +293,19 @@ export async function sendViaOpenClaw(
     resolvedTarget = findChannelTarget(channel)
   }
 
-  // For Feishu: try card message first (rich, with clickable button)
+  // For Feishu: send card + plain text for copying
   if (channel === 'feishu' && resolvedTarget) {
-    // Extract open_id from target (format: "user:ou_xxx")
     const openId = resolvedTarget.replace(/^user:/, '')
     if (openId.startsWith('ou_')) {
       const card = buildTaskCard(payload)
       const sent = await sendFeishuCard(accountId, openId, card)
-      if (sent) return true
-      // Fall through to CLI if card failed
+      if (sent) {
+        // Send plain text follow-up for easy copying (only for completed tasks with body)
+        if (payload.event === 'task.completed' && payload.body && payload.body.length > 50) {
+          await sendFeishuText(accountId, openId, `📋 任务 #${payload.taskNumber} 结果（可复制）：\n\n${payload.body}`)
+        }
+        return true
+      }
     }
   }
 

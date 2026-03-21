@@ -3,11 +3,12 @@
 import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { RefreshCw, Bot } from 'lucide-react'
-import { fetchAgents, detectAgents, type Agent } from '@/lib/api'
+import { RefreshCw, Bot, Star } from 'lucide-react'
+import { fetchAgents, detectAgents, getSettings, updateSettings, type Agent } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { timeAgo } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast'
 
 const statusColors: Record<string, string> = {
   online: 'border-l-green-500',
@@ -36,7 +37,7 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-zinc-800 ${className || ''}`} />
 }
 
-function AgentCard({ agent }: { agent: Agent }) {
+function AgentCard({ agent, isDefault, onSetDefault }: { agent: Agent; isDefault: boolean; onSetDefault: (id: string) => void }) {
   const router = useRouter()
   let config: Record<string, any> = {}
   try { config = agent.adapterConfig ? JSON.parse(agent.adapterConfig) : {} } catch {}
@@ -49,7 +50,9 @@ function AgentCard({ agent }: { agent: Agent }) {
       : '离线'
 
   return (
-    <div className={`rounded-lg border border-zinc-800 border-l-2 ${statusColors[agent.status] || 'border-l-zinc-600'} bg-zinc-900/50 p-4 space-y-2.5 hover:border-zinc-700 transition-colors activity-row-enter overflow-hidden ${isBusy ? 'shadow-[0_0_12px_-3px_rgba(168,85,247,0.15)]' : ''}`}>
+    <div className={`rounded-lg border border-l-2 ${statusColors[agent.status] || 'border-l-zinc-600'} bg-zinc-900/50 p-4 space-y-2.5 hover:border-zinc-700 transition-colors activity-row-enter overflow-hidden ${
+      isDefault ? 'border-yellow-500/40' : 'border-zinc-800'
+    } ${isBusy ? 'shadow-[0_0_12px_-3px_rgba(168,85,247,0.15)]' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2 flex-shrink-0">
@@ -57,6 +60,11 @@ function AgentCard({ agent }: { agent: Agent }) {
             <span className={`relative rounded-full h-2 w-2 ${statusDotColors[agent.status] || 'bg-zinc-500'}`} />
           </span>
           <h3 className="font-medium text-zinc-100 text-sm">{agent.displayName || agent.name}</h3>
+          {isDefault && (
+            <span className="text-yellow-500 text-[10px] font-semibold flex items-center gap-0.5">
+              <Star className="h-3 w-3 fill-yellow-500" /> 默认
+            </span>
+          )}
         </div>
         <Badge variant={agent.status as 'online' | 'busy' | 'offline'}>{statusLabels[agent.status] || agent.status}</Badge>
       </div>
@@ -79,7 +87,6 @@ function AgentCard({ agent }: { agent: Agent }) {
         <div className="text-xs text-zinc-600 space-y-0.5">
           <div className="truncate">ID: <span className="font-mono text-zinc-500">{config.openclawAgentId}</span></div>
           {config.workspace && <div className="truncate">工作目录: <span className="font-mono text-zinc-500">{config.workspace}</span></div>}
-          {config.isDefault && <span className="text-yellow-500/80 text-[10px] uppercase tracking-wider font-semibold">★ 默认智能体</span>}
         </div>
       )}
 
@@ -94,25 +101,47 @@ function AgentCard({ agent }: { agent: Agent }) {
         <p className="text-[11px] text-zinc-600">{timeAgo(agent.lastDetectedAt)} 前检测到</p>
       )}
 
-      <button
-        onClick={() => router.push(`/tasks?agent=${agent.id}`)}
-        className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer mt-1"
-      >
-        查看任务 →
-      </button>
+      <div className="flex items-center gap-3 mt-1">
+        <button
+          onClick={() => router.push(`/tasks?agent=${agent.id}`)}
+          className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer"
+        >
+          查看任务 →
+        </button>
+        {!isDefault && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSetDefault(agent.id); }}
+            className="text-xs text-zinc-500 hover:text-yellow-400 cursor-pointer"
+          >
+            设为默认
+          </button>
+        )}
+      </div>
     </div>
   )
 }
 
 export default function AgentsPage() {
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
 
   const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: fetchAgents })
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings })
+
+  const defaultAgentId = settings?.defaultAgentId || ''
 
   const detectMut = useMutation({
     mutationFn: detectAgents,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
+    },
+  })
+
+  const setDefaultMut = useMutation({
+    mutationFn: (agentId: string) => updateSettings({ defaultAgentId: agentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
+      addToast({ type: 'success', title: '默认智能体已更新' })
     },
   })
 
@@ -122,8 +151,16 @@ export default function AgentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const onlineAgents = agents.filter((a) => a.status === 'online' || a.status === 'busy')
-  const offlineAgents = agents.filter((a) => a.status === 'offline')
+  // Sort: default first, then online, then offline
+  const sorted = [...agents].sort((a, b) => {
+    if (a.id === defaultAgentId) return -1
+    if (b.id === defaultAgentId) return 1
+    const statusOrder: Record<string, number> = { busy: 0, online: 1, offline: 2 }
+    return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2)
+  })
+
+  const onlineAgents = sorted.filter((a) => a.status === 'online' || a.status === 'busy')
+  const offlineAgents = sorted.filter((a) => a.status === 'offline')
 
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 pl-12 lg:pl-6 space-y-6">
@@ -161,7 +198,7 @@ export default function AgentsPage() {
               <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">在线 ({onlineAgents.length})</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {onlineAgents.map((agent) => (
-                  <AgentCard key={agent.id} agent={agent} />
+                  <AgentCard key={agent.id} agent={agent} isDefault={agent.id === defaultAgentId} onSetDefault={(id) => setDefaultMut.mutate(id)} />
                 ))}
               </div>
             </div>
@@ -171,7 +208,7 @@ export default function AgentsPage() {
               <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">离线 ({offlineAgents.length})</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {offlineAgents.map((agent) => (
-                  <AgentCard key={agent.id} agent={agent} />
+                  <AgentCard key={agent.id} agent={agent} isDefault={agent.id === defaultAgentId} onSetDefault={(id) => setDefaultMut.mutate(id)} />
                 ))}
               </div>
             </div>

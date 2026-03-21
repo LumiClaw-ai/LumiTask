@@ -40,6 +40,7 @@ export const tasks = sqliteTable("tasks", {
   sessionId: text("session_id"), // OpenClaw session ID for context continuity
   sourceChannel: text("source_channel"), // Origin channel: feishu, discord, telegram...
   sourceAccountId: text("source_account_id"), // Channel account ID for reply routing
+  sourceTarget: text("source_target"), // Recipient target: user:ou_xxx (feishu), chat_id (discord)
   retryCount: integer("retry_count").default(0),
   maxRetries: integer("max_retries").default(0),
   // Results

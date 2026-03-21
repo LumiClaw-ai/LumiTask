@@ -34,11 +34,11 @@ export async function saveNotificationConfig(config: NotificationConfig): Promis
  */
 export async function notify(
   payload: NotificationPayload,
-  taskSource?: { sourceChannel?: string | null; sourceAccountId?: string | null }
+  taskSource?: { sourceChannel?: string | null; sourceAccountId?: string | null; sourceTarget?: string | null }
 ): Promise<boolean> {
   // Priority 1: Route back to task's source channel
   if (taskSource?.sourceChannel && taskSource?.sourceAccountId) {
-    return sendViaOpenClaw(taskSource.sourceChannel, taskSource.sourceAccountId, payload)
+    return sendViaOpenClaw(taskSource.sourceChannel, taskSource.sourceAccountId, payload, taskSource.sourceTarget || undefined)
   }
 
   // Priority 2: Global notification config from Settings

@@ -100,28 +100,58 @@ export async function discoverChannels(): Promise<ChannelInfo[]> {
 export async function sendViaOpenClaw(
   channel: string,
   accountId: string,
-  payload: NotificationPayload
+  payload: NotificationPayload,
+  target?: string,
 ): Promise<boolean> {
   const binaryPath = await findOpenClawBinary()
   if (!binaryPath) return false
 
   const text = formatMessage(payload)
 
+  // Resolve target: use provided target, or try to find from session data
+  let resolvedTarget = target
+  if (!resolvedTarget) {
+    resolvedTarget = findFeishuTarget(channel)
+  }
+
   try {
     const args = [
       'message', 'send',
       '--channel', channel,
       '--account', accountId,
-      '--text', JSON.stringify(text),
+      '-m', JSON.stringify(text),
     ]
-    execSync(`"${binaryPath}" ${args.join(' ')} 2>/dev/null`, {
+    if (resolvedTarget) {
+      args.push('--target', resolvedTarget)
+    }
+    execSync(`"${binaryPath}" ${args.join(' ')}`, {
       encoding: 'utf-8',
-      timeout: 15000,
+      timeout: 30000,
+      stdio: ['ignore', 'pipe', 'pipe'],
     })
+    console.log(`[Notify] Sent via ${channel}/${accountId}`)
     return true
-  } catch {
+  } catch (err: any) {
+    console.error(`[Notify] Failed to send via ${channel}:`, err.message?.slice(0, 200))
     return false
   }
+}
+
+/** Try to find the Feishu user target from session data */
+function findFeishuTarget(channel: string): string | undefined {
+  if (channel !== 'feishu') return undefined
+  try {
+    const { homedir } = require('os')
+    const { readFileSync } = require('fs')
+    const { join } = require('path')
+    const openclawHome = process.env.OPENCLAW_HOME || join(homedir(), '.openclaw')
+    const sessionsFile = join(openclawHome, 'agents', 'main', 'sessions', 'sessions.json')
+    const content = readFileSync(sessionsFile, 'utf-8')
+    // Find first feishu direct session with a target
+    const match = content.match(/"lastTo"\s*:\s*"(user:ou_[^"]+)"/)
+    if (match) return match[1]
+  } catch {}
+  return undefined
 }
 
 function formatMessage(payload: NotificationPayload): string {

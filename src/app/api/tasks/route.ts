@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
       // Source channel for auto-notification routing
       sourceChannel: body.sourceChannel ?? null,
       sourceAccountId: body.sourceAccountId ?? null,
+      sourceTarget: body.sourceTarget ?? null,
       createdAt: now,
       updatedAt: now,
     };

@@ -42,12 +42,15 @@ Content-Type: application/json
 - concurrencyKey — 并发控制 key，相同 key 的任务不会同时执行
 - maxRetries — 失败后最大重试次数
 - workingDirectory — Agent 执行时的工作目录
-- source — 来源标记：web | chat | cli
+- source — 来源标记：web | chat | cli（你创建时请用 "chat"）
+- agentName — 你的 agent 名称（配合 source: "chat" 使用，任务会自动分配给你）
 
 示例：
 curl -X POST http://localhost:3179/api/tasks \
   -H "Content-Type: application/json" \
-  -d '{"title": "重构登录模块", "description": "迁移到新的 auth 中间件", "source": "chat"}'
+  -d '{"title": "重构登录模块", "description": "迁移到新的 auth 中间件", "source": "chat", "agentName": "你的agent名称"}'
+
+注意：创建任务时务必带上 source: "chat" 和你的 agentName，这样任务会自动分配给你而不是其他 agent。
 
 ## 查询任务
 

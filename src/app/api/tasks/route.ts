@@ -89,19 +89,28 @@ export async function POST(request: NextRequest) {
       scheduleNextAt = getNextCronTime(body.scheduleCron);
     }
 
-    // Auto-assign: if no agent specified, use default from settings, then first online
+    // Auto-assign logic:
+    // 1. If assigneeAgentId is explicitly provided, use it
+    // 2. If source=chat and agentName is provided, find that agent (the one creating the task)
+    // 3. Fall back to default agent from settings
+    // 4. Fall back to first online agent
     let assigneeAgentId = body.assigneeAgentId ?? null;
+
+    if (!assigneeAgentId && body.source === "chat" && body.agentName) {
+      // Agent creating via chat — assign to itself
+      const [sourceAgent] = await db.select().from(agents).where(eq(agents.name, body.agentName));
+      if (sourceAgent) assigneeAgentId = sourceAgent.id;
+    }
+
     if (!assigneeAgentId) {
       const { getSetting } = await import("@/lib/db");
       const defaultAgentId = getSetting("defaultAgentId");
       if (defaultAgentId) {
-        // Verify the default agent exists
         const [defaultAgent] = await db.select().from(agents).where(eq(agents.id, defaultAgentId));
         if (defaultAgent) assigneeAgentId = defaultAgentId;
       }
     }
     if (!assigneeAgentId) {
-      // Fallback: first online agent
       const onlineAgents = await db.select().from(agents).where(eq(agents.status, "online"));
       if (onlineAgents.length > 0) {
         assigneeAgentId = onlineAgents[0].id;

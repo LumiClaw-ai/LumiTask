@@ -156,6 +156,18 @@ export async function cancelTask(id: string): Promise<void> {
   await request<void>(`/tasks/${id}/cancel`, { method: 'POST' })
 }
 
+export async function pauseTask(id: string, reason?: string): Promise<void> {
+  await request<void>(`/tasks/${id}/pause`, { method: 'POST', body: JSON.stringify({ reason }) })
+}
+
+export async function resumeTask(id: string): Promise<void> {
+  await request<void>(`/tasks/${id}/resume`, { method: 'POST' })
+}
+
+export async function advanceTask(id: string, summary?: string): Promise<void> {
+  await request<void>(`/tasks/${id}/advance`, { method: 'POST', body: JSON.stringify({ summary }) })
+}
+
 export async function completeTask(id: string, summary: string, result?: string) {
   return request<Task>(`/tasks/${id}/complete`, {
     method: 'POST',

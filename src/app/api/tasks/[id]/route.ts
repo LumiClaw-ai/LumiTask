@@ -4,6 +4,7 @@ import { eq, asc, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { tasks, activityLog, artifacts, agents } from "@/lib/db/schema";
 import { eventBus } from "@/lib/events";
+import { isValidTransition, getValidNextStates, sanitizeTitle } from "@/lib/task-validation";
 
 export async function GET(
   _request: NextRequest,
@@ -74,10 +75,24 @@ export async function PATCH(
     const body = await request.json();
     const now = Date.now();
 
+    // Validate status transition if status is being changed
+    if (body.status) {
+      const [current] = await db.select({ status: tasks.status }).from(tasks).where(eq(tasks.id, id));
+      if (!current) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+      if (!isValidTransition(current.status, body.status)) {
+        return NextResponse.json({
+          error: `Invalid status transition: ${current.status} → ${body.status}`,
+          validNextStates: getValidNextStates(current.status),
+        }, { status: 422 });
+      }
+    }
+
     const updates: Record<string, any> = { updatedAt: now };
-    for (const field of ["title", "description", "sortOrder", "dueAt", "workingDirectory", "scheduleType", "scheduleCron", "scheduleAt", "concurrencyKey", "maxRetries", "parentTaskId", "assigneeAgentId", "status"]) {
+    for (const field of ["description", "sortOrder", "dueAt", "workingDirectory", "scheduleType", "scheduleCron", "scheduleAt", "concurrencyKey", "maxRetries", "parentTaskId", "assigneeAgentId", "status"]) {
       if (body[field] !== undefined) updates[field] = body[field];
     }
+    // Sanitize title
+    if (body.title !== undefined) updates.title = sanitizeTitle(body.title);
     // JSON fields need serialization
     if (body.dependsOn !== undefined) updates.dependsOn = body.dependsOn ? JSON.stringify(body.dependsOn) : null;
     if (body.inputContext !== undefined) updates.inputContext = body.inputContext ? JSON.stringify(body.inputContext) : null;

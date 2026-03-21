@@ -5,8 +5,17 @@ import { executeTask } from './task-executor'
 import { canAcquire, acquire } from './concurrency'
 import { eventBus } from '@/lib/events'
 
-// Per-agent max concurrent tasks
+// Per-agent max concurrent tasks (can be overridden via settings)
 const DEFAULT_MAX_CONCURRENT = 1
+
+function getMaxConcurrent(): number {
+  try {
+    const { getSetting } = require('@/lib/db')
+    const val = getSetting('maxConcurrentPerAgent', '1')
+    const n = parseInt(val, 10)
+    return n > 0 ? n : DEFAULT_MAX_CONCURRENT
+  } catch { return DEFAULT_MAX_CONCURRENT }
+}
 
 let schedulerInterval: NodeJS.Timeout | null = null
 
@@ -78,7 +87,7 @@ async function isAgentAvailable(agentId: string): Promise<boolean> {
   }).from(tasks)
     .where(and(eq(tasks.status, 'running'), eq(tasks.assigneeAgentId, agentId)))
 
-  return (result?.count || 0) < DEFAULT_MAX_CONCURRENT
+  return (result?.count || 0) < getMaxConcurrent()
 }
 
 /** Dispatch next queued task for a specific agent */

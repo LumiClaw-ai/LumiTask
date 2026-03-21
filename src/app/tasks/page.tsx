@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { Suspense, useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import { Plus, LayoutGrid, Calendar, List, Search } from 'lucide-react'
@@ -43,7 +43,15 @@ function getDateRange(preset: DatePreset, customFrom: string, customTo: string):
   }
 }
 
-export default function TasksPage() {
+export default function TasksPageWrapper() {
+  return (
+    <Suspense>
+      <TasksPage />
+    </Suspense>
+  )
+}
+
+function TasksPage() {
   const searchParams = useSearchParams()
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [datePreset, setDatePreset] = useState<DatePreset>('all')

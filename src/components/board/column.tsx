@@ -29,9 +29,15 @@ export function Column({
         <span className="text-xs text-zinc-500 bg-zinc-800 rounded-full px-2 py-0.5">{count}</span>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
-        ))}
+        {tasks.length === 0 ? (
+          <div className="flex items-center justify-center h-20 text-xs text-zinc-600">
+            暂无任务
+          </div>
+        ) : (
+          tasks.map((task) => (
+            <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
+          ))
+        )}
       </div>
     </div>
   )

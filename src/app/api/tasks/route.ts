@@ -5,6 +5,7 @@ import { db, getNextTaskNumber } from "@/lib/db";
 import { tasks, activityLog, agents } from "@/lib/db/schema";
 import { eventBus } from "@/lib/events";
 import { sql } from "drizzle-orm";
+import { sanitizeTitle } from "@/lib/task-validation";
 
 export async function GET(request: NextRequest) {
   try {
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
     const task = {
       id,
       number,
-      title: body.title,
+      title: sanitizeTitle(body.title),
       description: body.description ?? null,
       status: "open" as const,
       assigneeAgentId,

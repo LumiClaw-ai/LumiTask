@@ -4,7 +4,15 @@ import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
 import { executeTask } from "@/lib/agents/task-executor";
 
-const MAX_CONCURRENT_PER_AGENT = 1;
+import { getSetting } from "@/lib/db";
+
+function getMaxConcurrent(): number {
+  try {
+    const val = getSetting('maxConcurrentPerAgent', '1');
+    const n = parseInt(val, 10);
+    return n > 0 ? n : 1;
+  } catch { return 1; }
+}
 
 export async function POST(
   _request: NextRequest,
@@ -28,7 +36,7 @@ export async function POST(
       and(eq(tasks.status, 'running'), eq(tasks.assigneeAgentId, task.assigneeAgentId))
     );
 
-    if ((running?.count || 0) >= MAX_CONCURRENT_PER_AGENT) {
+    if ((running?.count || 0) >= getMaxConcurrent()) {
       // Agent is busy — queue the task for automatic dispatch when current finishes
       await db.update(tasks).set({
         status: 'open',

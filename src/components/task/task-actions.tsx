@@ -10,6 +10,9 @@ import {
   assignTask,
   executeTask,
   cancelTask,
+  pauseTask,
+  resumeTask,
+  advanceTask,
   completeTask,
   blockTask,
   failTask,
@@ -20,7 +23,7 @@ import {
   type Task,
 } from '@/lib/api'
 
-type ModalType = 'assign' | 'complete' | 'block' | 'fail' | 'edit' | 'delete' | null
+type ModalType = 'assign' | 'complete' | 'block' | 'fail' | 'edit' | 'delete' | 'pause' | 'advance' | null
 
 export function TaskActions({ task, onDeleted }: { task: Task; onDeleted?: () => void }) {
   const queryClient = useQueryClient()
@@ -42,9 +45,14 @@ export function TaskActions({ task, onDeleted }: { task: Task; onDeleted?: () =>
   const executeMut = useMutation({ mutationFn: () => executeTask(task.id), onSuccess: invalidate })
   const cancelMut = useMutation({ mutationFn: () => cancelTask(task.id), onSuccess: invalidate })
   const reopenMut = useMutation({ mutationFn: () => reopenTask(task.id), onSuccess: invalidate })
-  const cancelStatusMut = useMutation({
-    mutationFn: () => updateTask(task.id, { status: 'cancelled' } as Partial<Task>),
-    onSuccess: invalidate,
+  const pauseMut = useMutation({
+    mutationFn: () => pauseTask(task.id, input),
+    onSuccess: () => { invalidate(); setModal(null); setInput('') },
+  })
+  const resumeMut = useMutation({ mutationFn: () => resumeTask(task.id), onSuccess: invalidate })
+  const advanceMut = useMutation({
+    mutationFn: () => advanceTask(task.id, input),
+    onSuccess: () => { invalidate(); setModal(null); setInput('') },
   })
 
   const assignMut = useMutation({
@@ -102,16 +110,23 @@ export function TaskActions({ task, onDeleted }: { task: Task; onDeleted?: () =>
       <Button key="start" size="sm" onClick={() => executeMut.mutate()} disabled={executeMut.isPending}>▶ 执行</Button>,
     ],
     running: [
-      <Button key="stop" size="sm" variant="destructive" onClick={() => cancelMut.mutate()} disabled={cancelMut.isPending}>■ 停止</Button>,
+      <Button key="pause" size="sm" variant="outline" onClick={() => setModal('pause')}>⏸ 暂停</Button>,
+      <Button key="stop" size="sm" variant="destructive" onClick={() => cancelMut.mutate()} disabled={cancelMut.isPending}>■ 取消</Button>,
     ],
     blocked: [
-      <Button key="reopen" size="sm" onClick={() => reopenMut.mutate()}>解除阻塞</Button>,
+      <Button key="resume" size="sm" onClick={() => resumeMut.mutate()} disabled={resumeMut.isPending}>▶ 恢复</Button>,
+      <Button key="advance" size="sm" variant="outline" onClick={() => setModal('advance')}>⏭ 手动完成</Button>,
     ],
     failed: [
-      <Button key="reopen" size="sm" onClick={() => reopenMut.mutate()}>重新打开</Button>,
+      <Button key="resume" size="sm" onClick={() => resumeMut.mutate()} disabled={resumeMut.isPending}>🔄 重试</Button>,
+      <Button key="advance" size="sm" variant="outline" onClick={() => setModal('advance')}>⏭ 手动完成</Button>,
     ],
-    done: [],
-    cancelled: [],
+    done: [
+      <Button key="reopen" size="sm" variant="outline" onClick={() => reopenMut.mutate()}>重新打开</Button>,
+    ],
+    cancelled: [
+      <Button key="reopen" size="sm" variant="outline" onClick={() => reopenMut.mutate()}>重新打开</Button>,
+    ],
   }
 
   // Edit + Delete always available (except during running)
@@ -228,6 +243,36 @@ export function TaskActions({ task, onDeleted }: { task: Task; onDeleted?: () =>
           <DialogFooter>
             <DialogClose asChild><Button variant="ghost">取消</Button></DialogClose>
             <Button variant="destructive" disabled={!input.trim() || blockMut.isPending} onClick={() => blockMut.mutate()}>阻塞</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pause Dialog */}
+      <Dialog open={modal === 'pause'} onOpenChange={(v) => !v && setModal(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>暂停任务</DialogTitle></DialogHeader>
+          <p className="text-sm text-zinc-400">暂停后任务进程会被终止，可以稍后恢复。</p>
+          <textarea className={`${inputClass} min-h-[60px]`} placeholder="暂停原因（可选）" value={input} onChange={(e) => setInput(e.target.value)} />
+          <DialogFooter>
+            <DialogClose asChild><Button variant="ghost">取消</Button></DialogClose>
+            <Button variant="destructive" disabled={pauseMut.isPending} onClick={() => pauseMut.mutate()}>
+              {pauseMut.isPending ? '暂停中...' : '确认暂停'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Advance Dialog */}
+      <Dialog open={modal === 'advance'} onOpenChange={(v) => !v && setModal(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>手动完成任务</DialogTitle></DialogHeader>
+          <p className="text-sm text-zinc-400">跳过当前状态，直接标记为完成。</p>
+          <textarea className={`${inputClass} min-h-[60px]`} placeholder="完成说明（可选）" value={input} onChange={(e) => setInput(e.target.value)} />
+          <DialogFooter>
+            <DialogClose asChild><Button variant="ghost">取消</Button></DialogClose>
+            <Button disabled={advanceMut.isPending} onClick={() => advanceMut.mutate()}>
+              {advanceMut.isPending ? '处理中...' : '确认完成'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

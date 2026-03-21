@@ -154,6 +154,35 @@ export function TaskDrawer({ taskId, onClose }: TaskDrawerProps) {
                 )}
               </div>
 
+              {/* Workflow stage visualization */}
+              <div className="px-5 pb-2 flex items-center gap-1 overflow-x-auto">
+                {[
+                  { key: 'created', label: '创建', match: () => true },
+                  { key: 'running', label: '执行', match: () => ['running', 'blocked', 'done', 'failed'].includes(task.status) },
+                  { key: 'done', label: '完成', match: () => task.status === 'done' },
+                ].map((stage, i, arr) => {
+                  const active = stage.match()
+                  const isCurrent =
+                    (stage.key === 'created' && ['open', 'assigned'].includes(task.status)) ||
+                    (stage.key === 'running' && ['running', 'blocked'].includes(task.status)) ||
+                    (stage.key === 'done' && task.status === 'done')
+                  const isFailed = stage.key === 'running' && task.status === 'failed'
+                  return (
+                    <div key={stage.key} className="flex items-center gap-1">
+                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                        isFailed ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
+                        isCurrent ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.15)]' :
+                        active ? 'bg-green-500/10 text-green-400' :
+                        'text-zinc-600'
+                      }`}>
+                        {isFailed ? '✗' : active && !isCurrent ? '✓' : '●'} {stage.label}
+                      </div>
+                      {i < arr.length - 1 && <span className={`text-[10px] ${active ? 'text-zinc-500' : 'text-zinc-700'}`}>→</span>}
+                    </div>
+                  )
+                })}
+              </div>
+
               <div className="px-5 pb-2">
                 <TaskActions task={task} onDeleted={onClose} />
               </div>

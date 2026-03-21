@@ -139,6 +139,9 @@ export async function POST(request: NextRequest) {
       // Concurrency & retry
       concurrencyKey: body.concurrencyKey ?? null,
       maxRetries: body.maxRetries ?? 0,
+      // Source channel for auto-notification routing
+      sourceChannel: body.sourceChannel ?? null,
+      sourceAccountId: body.sourceAccountId ?? null,
       createdAt: now,
       updatedAt: now,
     };

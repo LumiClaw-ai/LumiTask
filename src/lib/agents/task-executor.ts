@@ -159,7 +159,7 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
       })
 
       eventBus.broadcast('task.blocked', { taskId, number: task.number, blockReason: event.message })
-      notify(buildTaskNotification('task.blocked', { id: taskId, number: task.number, title: task.title }, { blockReason: event.message })).catch(() => {})
+      notify(buildTaskNotification('task.blocked', { id: taskId, number: task.number, title: task.title }, { blockReason: event.message }), { sourceChannel: task.sourceChannel, sourceAccountId: task.sourceAccountId }).catch(() => {})
       return
     }
 
@@ -224,7 +224,7 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
       })
 
       eventBus.broadcast('task.completed', { taskId, number: task.number, summary: result.summary })
-      notify(buildTaskNotification('task.completed', { id: taskId, number: task.number, title: task.title }, { summary: result.summary })).catch(() => {})
+      notify(buildTaskNotification('task.completed', { id: taskId, number: task.number, title: task.title }, { summary: result.summary }), { sourceChannel: task.sourceChannel, sourceAccountId: task.sourceAccountId }).catch(() => {})
     } else {
       // Retry logic
       const retryCount = (task.retryCount || 0) + 1
@@ -266,7 +266,7 @@ export async function executeTask(taskId: string, promptOverride?: string): Prom
         })
 
         eventBus.broadcast('task.failed', { taskId, number: task.number, error: result.error })
-        notify(buildTaskNotification('task.failed', { id: taskId, number: task.number, title: task.title }, { error: result.error })).catch(() => {})
+        notify(buildTaskNotification('task.failed', { id: taskId, number: task.number, title: task.title }, { error: result.error }), { sourceChannel: task.sourceChannel, sourceAccountId: task.sourceAccountId }).catch(() => {})
       }
     }
 

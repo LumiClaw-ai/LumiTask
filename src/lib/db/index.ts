@@ -52,6 +52,8 @@ function createDb() {
       output_result TEXT,
       concurrency_key TEXT,
       session_id TEXT,
+      source_channel TEXT,
+      source_account_id TEXT,
       retry_count INTEGER DEFAULT 0,
       max_retries INTEGER DEFAULT 0,
       summary TEXT,
@@ -129,6 +131,8 @@ function createDb() {
     "ALTER TABLE tasks ADD COLUMN retry_count INTEGER DEFAULT 0",
     "ALTER TABLE tasks ADD COLUMN max_retries INTEGER DEFAULT 0",
     "ALTER TABLE tasks ADD COLUMN session_id TEXT",
+    "ALTER TABLE tasks ADD COLUMN source_channel TEXT",
+    "ALTER TABLE tasks ADD COLUMN source_account_id TEXT",
   ];
 
   for (const stmt of alterStatements) {

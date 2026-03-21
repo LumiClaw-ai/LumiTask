@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import { fetchTasks, fetchAgents, type Task } from '@/lib/api'
 import { useSSE } from '@/hooks/use-sse'
 import { Column } from './column'
@@ -20,8 +21,15 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ dateFrom, dateTo }: KanbanBoardProps) {
+  const searchParams = useSearchParams()
   const [agentFilter, setAgentFilter] = useState('')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+
+  // Read ?agent= from URL
+  useEffect(() => {
+    const agentParam = searchParams.get('agent')
+    if (agentParam) setAgentFilter(agentParam)
+  }, [searchParams])
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks', dateFrom, dateTo],

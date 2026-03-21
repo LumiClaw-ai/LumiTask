@@ -63,7 +63,7 @@ export function buildTaskNotification(
       return {
         event,
         title: `任务 #${task.number} 已完成`,
-        body: `${extra?.summary || task.title}\n\n查看详情: ${actionUrl}`,
+        body: `${extra?.summary || task.title}`,
         level: 'info',
         taskId: task.id,
         taskNumber: task.number,
@@ -73,7 +73,7 @@ export function buildTaskNotification(
       return {
         event,
         title: `任务 #${task.number} 失败`,
-        body: `${task.title}\n原因：${extra?.error || '未知错误'}\n\n查看详情: ${actionUrl}`,
+        body: `${task.title}\n原因：${extra?.error || '未知错误'}`,
         level: 'error',
         taskId: task.id,
         taskNumber: task.number,
@@ -83,7 +83,7 @@ export function buildTaskNotification(
       return {
         event,
         title: `任务 #${task.number} 需要你的决定`,
-        body: `${task.title}\n${extra?.blockReason || ''}\n\n前往处理: ${actionUrl}`,
+        body: `${task.title}\n${extra?.blockReason || ''}`,
         level: 'warning',
         taskId: task.id,
         taskNumber: task.number,
@@ -93,7 +93,7 @@ export function buildTaskNotification(
       return {
         event,
         title: `任务 #${task.number} 依赖就绪，开始执行`,
-        body: `${task.title}\n\n查看进度: ${actionUrl}`,
+        body: `${task.title}`,
         level: 'info',
         taskId: task.id,
         taskNumber: task.number,
@@ -103,7 +103,7 @@ export function buildTaskNotification(
       return {
         event,
         title: `任务 #${task.number}`,
-        body: `${task.title}\n\n查看详情: ${actionUrl}`,
+        body: `${task.title}`,
         level: 'info',
         taskId: task.id,
         taskNumber: task.number,

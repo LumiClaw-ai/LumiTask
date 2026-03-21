@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import { Plus, LayoutGrid, Calendar, List, Search } from 'lucide-react'
 import { fetchTasks, fetchAgents, type Task } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -43,6 +44,7 @@ function getDateRange(preset: DatePreset, customFrom: string, customTo: string):
 }
 
 export default function TasksPage() {
+  const searchParams = useSearchParams()
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [datePreset, setDatePreset] = useState<DatePreset>('all')
   const [customFrom, setCustomFrom] = useState('')
@@ -50,6 +52,12 @@ export default function TasksPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+
+  // Open task drawer from URL param ?taskId=xxx
+  useEffect(() => {
+    const taskIdParam = searchParams.get('taskId')
+    if (taskIdParam) setSelectedTaskId(taskIdParam)
+  }, [searchParams])
 
   const { dateFrom, dateTo } = getDateRange(datePreset, customFrom, customTo)
 

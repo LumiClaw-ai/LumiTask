@@ -46,6 +46,13 @@ function createDb() {
       schedule_at INTEGER,
       schedule_next_at INTEGER,
       schedule_last_at INTEGER,
+      depends_on TEXT,
+      parent_task_id TEXT REFERENCES tasks(id),
+      input_context TEXT,
+      output_result TEXT,
+      concurrency_key TEXT,
+      retry_count INTEGER DEFAULT 0,
+      max_retries INTEGER DEFAULT 0,
       summary TEXT,
       result TEXT,
       block_reason TEXT,
@@ -112,6 +119,14 @@ function createDb() {
     // activity_log table migrations
     "ALTER TABLE activity_log ADD COLUMN tool_name TEXT",
     "ALTER TABLE activity_log ADD COLUMN tool_input TEXT",
+    // v0.2: task dependencies & structured I/O
+    "ALTER TABLE tasks ADD COLUMN depends_on TEXT",
+    "ALTER TABLE tasks ADD COLUMN parent_task_id TEXT REFERENCES tasks(id)",
+    "ALTER TABLE tasks ADD COLUMN input_context TEXT",
+    "ALTER TABLE tasks ADD COLUMN output_result TEXT",
+    "ALTER TABLE tasks ADD COLUMN concurrency_key TEXT",
+    "ALTER TABLE tasks ADD COLUMN retry_count INTEGER DEFAULT 0",
+    "ALTER TABLE tasks ADD COLUMN max_retries INTEGER DEFAULT 0",
   ];
 
   for (const stmt of alterStatements) {

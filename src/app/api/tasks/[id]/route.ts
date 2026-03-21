@@ -75,7 +75,7 @@ export async function PATCH(
     const now = Date.now();
 
     const updates: Record<string, any> = { updatedAt: now };
-    for (const field of ["title", "description", "sortOrder", "dueAt", "workingDirectory", "scheduleType", "scheduleCron", "scheduleAt", "concurrencyKey", "maxRetries", "parentTaskId"]) {
+    for (const field of ["title", "description", "sortOrder", "dueAt", "workingDirectory", "scheduleType", "scheduleCron", "scheduleAt", "concurrencyKey", "maxRetries", "parentTaskId", "assigneeAgentId", "status"]) {
       if (body[field] !== undefined) updates[field] = body[field];
     }
     // JSON fields need serialization

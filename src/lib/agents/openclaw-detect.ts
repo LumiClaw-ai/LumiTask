@@ -31,7 +31,7 @@ export async function checkOpenClawGateway(url?: string): Promise<boolean> {
     clearTimeout(timeout)
     if (res && res.ok) return true
   } catch {}
-  return existsSync(join(homedir(), '.openclaw'))
+  return false
 }
 
 export interface OpenClawAgentInfo {

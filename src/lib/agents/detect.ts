@@ -48,7 +48,7 @@ export async function detectLocalAgents(): Promise<DetectedAgent[]> {
           name: agentName,
           displayName,
           description: `Model: ${oa.model || 'default'}${oa.isDefault ? ' (default)' : ''}`,
-          available: true, // binary exists
+          available: gatewayAvailable, // online only if gateway is running
           version: oa.model || null,
           config: {
             binaryPath: openclawPath,
@@ -69,7 +69,7 @@ export async function detectLocalAgents(): Promise<DetectedAgent[]> {
         type: 'openclaw',
         name: 'openclaw',
         displayName: 'OpenClaw',
-        available: true,
+        available: gatewayAvailable,
         config: {
           binaryPath: openclawPath,
           gatewayUrl: process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:18789',

@@ -61,18 +61,13 @@ files:
   - "electron/icons/**/*"
 
 extraResources:
-  - from: ".next/standalone"
+  - from: "electron/.standalone"
     to: "standalone"
     filter:
       - "**/*"
-  - from: ".next/static"
-    to: "standalone/.next/static"
-    filter:
-      - "**/*"
-  - from: "public"
-    to: "standalone/public"
-    filter:
-      - "**/*"
+      - "**/node_modules/**"
+
+afterPack: electron/scripts/afterPack.js
 
 asar: true
 asarUnpack:

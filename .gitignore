@@ -45,6 +45,8 @@ next-env.d.ts
 /data/*.db-wal
 /data/*.db-shm
 electron/dist/
+electron/.standalone/
+release/
 data/
 
 # internal docs (keep local only, public docs go in /guide)

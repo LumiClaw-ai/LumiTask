@@ -11,10 +11,10 @@
     "cli:dev": "tsx cli/index.ts",
     "electron:compile": "npx esbuild electron/main.ts electron/preload.ts electron/server.ts --bundle --platform=node --external:electron --external:electron-updater --outdir=electron/dist --format=cjs",
     "electron:rebuild-native": "npx @electron/rebuild -f -w better-sqlite3 && bash -c 'SRC=$(find node_modules -name better_sqlite3.node | head -1) && DST=$(find .next/standalone -name better_sqlite3.node | head -1) && [ -n \"$DST\" ] && cp \"$SRC\" \"$DST\" && echo native module copied'",
-    "electron:copy-static": "cp -r .next/static .next/standalone/.next/static && (cp -r public .next/standalone/public 2>/dev/null || true)",
-    "electron:dev": "pnpm build && pnpm electron:copy-static && pnpm electron:rebuild-native && pnpm electron:compile && electron .",
-    "electron:build": "pnpm build && pnpm electron:copy-static && pnpm electron:rebuild-native && pnpm electron:compile && npx electron-builder --mac --dir && bash electron/scripts/copy-native.sh",
-    "electron:publish": "pnpm build && pnpm electron:copy-static && pnpm electron:rebuild-native && pnpm electron:compile && npx electron-builder --mac --win --linux --publish always"
+    "electron:prepare-standalone": "node electron/scripts/prepare-standalone.js",
+    "electron:dev": "pnpm build && pnpm electron:prepare-standalone && pnpm electron:compile && electron .",
+    "electron:build": "pnpm build && pnpm electron:prepare-standalone && pnpm electron:compile && npx electron-builder --mac --dir",
+    "electron:publish": "pnpm build && pnpm electron:prepare-standalone && pnpm electron:compile && npx electron-builder --mac --publish always"
   },
   "bin": {
     "lumitask": "./cli/dist/index.js"

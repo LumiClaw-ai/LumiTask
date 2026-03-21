@@ -14,7 +14,8 @@ function getServerPath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, "standalone", "server.js");
   }
-  return path.join(__dirname, "..", "..", ".next", "standalone", "server.js");
+  // Dev mode: use prepared standalone in electron/.standalone
+  return path.join(__dirname, "..", ".standalone", "server.js");
 }
 
 export function getServerUrl(): string {
@@ -39,7 +40,7 @@ export async function startServer(): Promise<void> {
     stdio: "pipe",
     cwd: app.isPackaged
       ? path.join(process.resourcesPath, "standalone")
-      : path.join(__dirname, "..", "..", ".next", "standalone"),
+      : path.join(__dirname, "..", ".standalone"),
   });
 
   serverProcess.stdout?.on("data", (data: Buffer) => {

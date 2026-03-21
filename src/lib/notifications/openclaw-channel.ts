@@ -163,12 +163,12 @@ function buildTaskCard(payload: NotificationPayload): Record<string, unknown> {
     })),
   })
 
-  // Body content — full result, no truncation (Feishu card auto-expands vertically)
+  // Body content — full result, converted to Feishu-compatible format
   if (payload.body) {
     elements.push({ tag: 'hr' })
     elements.push({
       tag: 'div',
-      text: { tag: 'lark_md', content: payload.body },
+      text: { tag: 'lark_md', content: markdownToLarkMd(payload.body) },
     })
   }
 
@@ -325,6 +325,27 @@ function findChannelTarget(channel: string): string | undefined {
     }
   } catch {}
   return undefined
+}
+
+/** Convert standard markdown to Feishu lark_md compatible format */
+function markdownToLarkMd(md: string): string {
+  return md
+    // Headers → bold text with newline
+    .replace(/^#{1,6}\s+(.+)$/gm, '**$1**')
+    // Unordered list items → bullet points
+    .replace(/^[\s]*[-*]\s+/gm, '• ')
+    // Ordered list items → numbered
+    .replace(/^[\s]*(\d+)\.\s+/gm, '$1. ')
+    // Code blocks → plain text (lark_md doesn't support ```)
+    .replace(/```[\w]*\n([\s\S]*?)```/g, (_match, code) => code.trim())
+    // Inline code → keep backticks (lark_md doesn't render them but they're readable)
+    // Blockquotes → italic
+    .replace(/^>\s+(.+)$/gm, '*$1*')
+    // Horizontal rules → empty line
+    .replace(/^---+$/gm, '')
+    // Clean up excessive blank lines
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function formatMessage(payload: NotificationPayload): string {

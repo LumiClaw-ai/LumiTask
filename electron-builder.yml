@@ -68,6 +68,7 @@ extraResources:
       - "**/node_modules/**"
 
 afterPack: electron/scripts/afterPack.js
+afterSign: electron/scripts/afterSign.js
 
 asar: true
 asarUnpack:

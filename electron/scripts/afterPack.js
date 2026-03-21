@@ -52,5 +52,31 @@ module.exports = async function afterPack(context) {
     console.log(`[afterPack] Hoisted ${entries.length} packages from .pnpm to top-level`);
   }
 
+  // Re-sign all frameworks and the app for macOS compatibility
+  // electron-builder's ad-hoc signing doesn't work well on newer macOS
+  const appPath = path.join(appDir, context.packager.appInfo.productFilename + '.app');
+  const frameworksDir = path.join(appPath, 'Contents', 'Frameworks');
+
+  console.log('[afterPack] Re-signing frameworks and app...');
+  const entitlements = path.join(__dirname, '..', 'entitlements.mac.plist');
+
+  // Sign all frameworks
+  try {
+    const frameworks = fs.readdirSync(frameworksDir).filter(f => f.endsWith('.framework') || f.endsWith('.app'));
+    for (const fw of frameworks) {
+      execSync(`codesign --force --sign - --entitlements "${entitlements}" "${path.join(frameworksDir, fw)}"`, { stdio: 'pipe' });
+    }
+  } catch (e) {
+    console.warn('[afterPack] Framework signing warning:', e.message);
+  }
+
+  // Sign the main app
+  try {
+    execSync(`codesign --force --sign - --entitlements "${entitlements}" "${appPath}"`, { stdio: 'pipe' });
+    console.log('[afterPack] App signed successfully');
+  } catch (e) {
+    console.warn('[afterPack] App signing warning:', e.message);
+  }
+
   console.log('[afterPack] Done!');
 };

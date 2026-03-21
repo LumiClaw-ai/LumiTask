@@ -1,4 +1,7 @@
 import { execSync } from 'child_process'
+import { readFileSync, existsSync } from 'fs'
+import { join } from 'path'
+import { homedir } from 'os'
 import { findOpenClawBinary } from '@/lib/agents/openclaw-detect'
 import type { ChannelInfo, NotificationPayload } from './types'
 
@@ -11,20 +14,13 @@ function safeJsonParse(output: string): unknown {
   const pairs: Record<string, string> = { '{': '}', '[': ']' }
   const closers = new Set(Object.values(pairs))
 
-  // Find each potential JSON start, use bracket matching, then try JSON.parse
   for (let i = 0; i < clean.length; i++) {
     const ch = clean[i]
     if (!pairs[ch]) continue
-
-    // Skip log-style lines like "[plugins]", "[warn]", etc.
     if (ch === '[') {
-      // Check if this [ is followed by a letter (log prefix) vs whitespace/{ (JSON array)
       const next = clean[i + 1]
-      if (next && next !== '\n' && next !== '\r' && next !== ' ' && next !== '{' && next !== '"' && next !== '[' && next !== ']') {
-        continue
-      }
+      if (next && next !== '\n' && next !== '\r' && next !== ' ' && next !== '{' && next !== '"' && next !== '[' && next !== ']') continue
     }
-
     const stack: string[] = []
     let end = -1
     for (let j = i; j < clean.length; j++) {
@@ -40,9 +36,174 @@ function safeJsonParse(output: string): unknown {
       catch { continue }
     }
   }
-
   return null
 }
+
+// ============================================================
+// Feishu API — direct card sending
+// ============================================================
+
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || join(homedir(), '.openclaw')
+
+interface FeishuCredentials {
+  appId: string
+  appSecret: string
+}
+
+function getFeishuCredentials(accountId: string): FeishuCredentials | null {
+  try {
+    const configPath = join(OPENCLAW_HOME, 'openclaw.json')
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'))
+    const account = config.channels?.feishu?.accounts?.[accountId]
+    if (!account?.appId || !account?.appSecret) return null
+    return { appId: account.appId, appSecret: account.appSecret }
+  } catch { return null }
+}
+
+let _tenantTokens = new Map<string, { token: string; expiresAt: number }>()
+
+async function getTenantToken(accountId: string): Promise<string | null> {
+  const cached = _tenantTokens.get(accountId)
+  if (cached && Date.now() < cached.expiresAt) return cached.token
+
+  const creds = getFeishuCredentials(accountId)
+  if (!creds) return null
+
+  try {
+    const res = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app_id: creds.appId, app_secret: creds.appSecret }),
+    })
+    const data = await res.json()
+    if (data.code === 0 && data.tenant_access_token) {
+      _tenantTokens.set(accountId, {
+        token: data.tenant_access_token,
+        expiresAt: Date.now() + (data.expire - 300) * 1000,
+      })
+      return data.tenant_access_token
+    }
+    console.error(`[Feishu:token] failed: ${data.msg}`)
+    return null
+  } catch (err) {
+    console.error('[Feishu:token] error:', err)
+    return null
+  }
+}
+
+async function sendFeishuCard(accountId: string, receiveId: string, card: Record<string, unknown>): Promise<boolean> {
+  const token = await getTenantToken(accountId)
+  if (!token) return false
+
+  try {
+    const res = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        receive_id: receiveId,
+        msg_type: 'interactive',
+        content: JSON.stringify(card),
+      }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      console.log(`[Feishu:card] sent OK, message_id=${data.data?.message_id}`)
+      return true
+    }
+    console.error(`[Feishu:card] failed: code=${data.code} msg=${data.msg}`)
+    return false
+  } catch (err) {
+    console.error('[Feishu:card] error:', err)
+    return false
+  }
+}
+
+// ============================================================
+// Card builder
+// ============================================================
+
+function buildTaskCard(payload: NotificationPayload): Record<string, unknown> {
+  const colorMap: Record<string, string> = {
+    info: 'green',
+    warning: 'orange',
+    error: 'red',
+  }
+  const iconMap: Record<string, string> = {
+    'task.completed': '✅',
+    'task.failed': '❌',
+    'task.blocked': '⚠️',
+    'task.dependencies_met': '🔗',
+  }
+
+  const icon = iconMap[payload.event] || '📋'
+  const color = colorMap[payload.level] || 'blue'
+
+  const elements: Record<string, unknown>[] = []
+
+  // Task info fields
+  const fields: { label: string; value: string }[] = [
+    { label: '任务', value: `#${payload.taskNumber} ${payload.title || ''}`.trim() },
+  ]
+  if (payload.event === 'task.completed') {
+    fields.push({ label: '状态', value: '已完成' })
+  } else if (payload.event === 'task.failed') {
+    fields.push({ label: '状态', value: '失败' })
+  } else if (payload.event === 'task.blocked') {
+    fields.push({ label: '状态', value: '等待决策' })
+  }
+
+  elements.push({
+    tag: 'div',
+    fields: fields.map(f => ({
+      is_short: true,
+      text: { tag: 'lark_md', content: `**${f.label}**\n${f.value}` },
+    })),
+  })
+
+  // Body content
+  if (payload.body) {
+    elements.push({ tag: 'hr' })
+    elements.push({
+      tag: 'div',
+      text: { tag: 'lark_md', content: payload.body.slice(0, 500) },
+    })
+  }
+
+  // Action button with URL
+  if (payload.actionUrl) {
+    elements.push({
+      tag: 'action',
+      actions: [{
+        tag: 'button',
+        text: { tag: 'plain_text', content: '📎 查看详情' },
+        type: 'default',
+        url: payload.actionUrl,
+      }],
+    })
+  }
+
+  // Footer
+  elements.push({
+    tag: 'note',
+    elements: [{ tag: 'plain_text', content: 'LumiTask' }],
+  })
+
+  return {
+    config: { wide_screen_mode: true },
+    header: {
+      title: { tag: 'plain_text', content: `${icon} ${payload.title}` },
+      template: color,
+    },
+    elements,
+  }
+}
+
+// ============================================================
+// Channel discovery
+// ============================================================
 
 /** Discover available notification channels from OpenClaw agents */
 export async function discoverChannels(): Promise<ChannelInfo[]> {
@@ -50,14 +211,12 @@ export async function discoverChannels(): Promise<ChannelInfo[]> {
   if (!binaryPath) return []
 
   try {
-    // Get agent-channel bindings
     const bindingsRaw = execSync(`"${binaryPath}" agents bindings --json 2>/dev/null`, {
       encoding: 'utf-8',
       timeout: 15000,
     })
     const bindings = safeJsonParse(bindingsRaw) as any[] | null
 
-    // Get agents list
     let agentsData: any[] | null = null
     try {
       const agentsRaw = execSync(`"${binaryPath}" agents list --json 2>/dev/null`, {
@@ -75,7 +234,6 @@ export async function discoverChannels(): Promise<ChannelInfo[]> {
     }
 
     const results: ChannelInfo[] = []
-
     if (Array.isArray(bindings)) {
       for (const b of bindings) {
         if (b.type === 'route' && b.match?.channel) {
@@ -96,23 +254,40 @@ export async function discoverChannels(): Promise<ChannelInfo[]> {
   }
 }
 
-/** Send notification via OpenClaw message send CLI */
+// ============================================================
+// Send notification
+// ============================================================
+
+/** Send notification via Feishu card (preferred) or OpenClaw CLI (fallback) */
 export async function sendViaOpenClaw(
   channel: string,
   accountId: string,
   payload: NotificationPayload,
   target?: string,
 ): Promise<boolean> {
+  // Resolve target
+  let resolvedTarget = target
+  if (!resolvedTarget) {
+    resolvedTarget = findChannelTarget(channel)
+  }
+
+  // For Feishu: try card message first (rich, with clickable button)
+  if (channel === 'feishu' && resolvedTarget) {
+    // Extract open_id from target (format: "user:ou_xxx")
+    const openId = resolvedTarget.replace(/^user:/, '')
+    if (openId.startsWith('ou_')) {
+      const card = buildTaskCard(payload)
+      const sent = await sendFeishuCard(accountId, openId, card)
+      if (sent) return true
+      // Fall through to CLI if card failed
+    }
+  }
+
+  // Fallback: CLI message send
   const binaryPath = await findOpenClawBinary()
   if (!binaryPath) return false
 
   const text = formatMessage(payload)
-
-  // Resolve target: use provided target, or try to find from session data
-  let resolvedTarget = target
-  if (!resolvedTarget) {
-    resolvedTarget = findFeishuTarget(channel)
-  }
 
   try {
     const args = [
@@ -129,7 +304,7 @@ export async function sendViaOpenClaw(
       timeout: 30000,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
-    console.log(`[Notify] Sent via ${channel}/${accountId}`)
+    console.log(`[Notify] Sent via CLI ${channel}/${accountId}`)
     return true
   } catch (err: any) {
     console.error(`[Notify] Failed to send via ${channel}:`, err.message?.slice(0, 200))
@@ -137,19 +312,17 @@ export async function sendViaOpenClaw(
   }
 }
 
-/** Try to find the Feishu user target from session data */
-function findFeishuTarget(channel: string): string | undefined {
-  if (channel !== 'feishu') return undefined
+/** Find target for a channel from session data */
+function findChannelTarget(channel: string): string | undefined {
   try {
-    const { homedir } = require('os')
-    const { readFileSync } = require('fs')
-    const { join } = require('path')
-    const openclawHome = process.env.OPENCLAW_HOME || join(homedir(), '.openclaw')
-    const sessionsFile = join(openclawHome, 'agents', 'main', 'sessions', 'sessions.json')
+    const sessionsFile = join(OPENCLAW_HOME, 'agents', 'main', 'sessions', 'sessions.json')
+    if (!existsSync(sessionsFile)) return undefined
     const content = readFileSync(sessionsFile, 'utf-8')
-    // Find first feishu direct session with a target
-    const match = content.match(/"lastTo"\s*:\s*"(user:ou_[^"]+)"/)
-    if (match) return match[1]
+
+    if (channel === 'feishu') {
+      const match = content.match(/"lastTo"\s*:\s*"(user:ou_[^"]+)"/)
+      if (match) return match[1]
+    }
   } catch {}
   return undefined
 }

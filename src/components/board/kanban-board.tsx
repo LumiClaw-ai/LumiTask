@@ -10,8 +10,8 @@ import { TaskDrawer } from '@/components/task/task-drawer'
 const COLUMNS = [
   { key: 'open', title: 'Open', color: 'blue', statuses: ['open', 'assigned'] },
   { key: 'running', title: 'Running', color: 'purple', statuses: ['running'] },
-  { key: 'blocked', title: 'Blocked', color: 'red', statuses: ['blocked'] },
   { key: 'done', title: 'Done', color: 'green', statuses: ['done', 'failed', 'cancelled'] },
+  { key: 'blocked', title: 'Blocked', color: 'red', statuses: ['blocked'] },
 ] as const
 
 interface KanbanBoardProps {

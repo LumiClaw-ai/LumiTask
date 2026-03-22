@@ -52,44 +52,60 @@ export class OpenClawAdapter implements AgentAdapter {
       let stderr = ''
       let elapsedSec = 0
 
-      // Heartbeat + session tail: read session JSONL for real progress
+      // Record task start time to filter out session messages from before this execution
+      const taskStartTime = Date.now()
       const seenMsgIds = new Set<string>()
-      const heartbeat = setInterval(async () => {
-        elapsedSec += 5
 
-        // Try reading session file for real-time progress
+      // Session progress reader — only reads messages after task started
+      const heartbeat = setInterval(async () => {
+        elapsedSec += 10
+
         try {
           const { readSessionTail, readAllSessions } = await import('@/lib/session-observer')
           const sessions = readAllSessions().filter(s => s.agentId === agentId)
           if (sessions.length > 0) {
             const latest = sessions.sort((a, b) => b.updatedAt - a.updatedAt)[0]
-            const msgs = readSessionTail(agentId, latest.sessionId, 5)
-            let hasNew = false
-            for (const msg of msgs) {
-              if (!msg.id || seenMsgIds.has(msg.id)) continue
-              seenMsgIds.add(msg.id)
-              hasNew = true
+            // Only read if session was updated after task started
+            if (latest.updatedAt >= taskStartTime - 5000) {
+              const msgs = readSessionTail(agentId, latest.sessionId, 5)
+              let hasNew = false
+              for (const msg of msgs) {
+                if (!msg.id || seenMsgIds.has(msg.id)) continue
+                // Skip messages from before this task started
+                if (msg.timestamp && new Date(msg.timestamp).getTime() < taskStartTime - 5000) {
+                  seenMsgIds.add(msg.id)
+                  continue
+                }
+                seenMsgIds.add(msg.id)
+                hasNew = true
 
-              if (msg.role === 'assistant' && msg.text) {
-                const text = msg.text.replace(/^\[\[reply_to_current\]\]\s*/i, '').slice(0, 300)
-                if (text) onEvent({ type: 'progress', message: text, timestamp: Date.now() })
-              }
-              if (msg.toolCalls) {
-                for (const tc of msg.toolCalls) {
-                  onEvent({ type: 'tool_use', message: `🔧 ${tc.name}`, toolName: tc.name, toolInput: tc.input.slice(0, 200), timestamp: Date.now() })
+                if (msg.role === 'assistant' && msg.text) {
+                  const text = msg.text.replace(/^\[\[reply_to_current\]\]\s*/i, '').slice(0, 300)
+                  if (text) onEvent({ type: 'progress', message: text, timestamp: Date.now() })
+                }
+                if (msg.toolCalls) {
+                  for (const tc of msg.toolCalls) {
+                    onEvent({ type: 'tool_use', message: `🔧 ${tc.name}`, toolName: tc.name, toolInput: tc.input.slice(0, 200), timestamp: Date.now() })
+                  }
+                }
+                if (msg.role === 'toolResult' && msg.toolResult) {
+                  onEvent({ type: 'tool_result', message: msg.toolResult.content.slice(0, 200), toolName: msg.toolResult.name, timestamp: Date.now() })
                 }
               }
-              if (msg.role === 'toolResult' && msg.toolResult) {
-                onEvent({ type: 'tool_result', message: msg.toolResult.content.slice(0, 200), toolName: msg.toolResult.name, timestamp: Date.now() })
-              }
+              if (hasNew) return
             }
-            if (hasNew) return // Got new data, skip generic heartbeat
           }
         } catch {}
 
-        // Fallback: generic heartbeat only if no session data
-        onEvent({ type: 'progress', message: `执行中... ${elapsedSec}s`, timestamp: Date.now() })
-      }, 5000)
+        // Fallback heartbeat — only broadcast via SSE, don't write to activity_log
+        // (the executor writes progress events to log; heartbeat is just for live display)
+        const { eventBus } = await import('@/lib/events')
+        eventBus.broadcast('task.heartbeat', {
+          taskId: context.taskId,
+          number: context.taskNumber,
+          message: `执行中... ${elapsedSec}s`,
+        })
+      }, 10000)
 
       proc.stdout.on('data', (chunk: Buffer) => {
         const text = chunk.toString()

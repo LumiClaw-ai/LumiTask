@@ -50,6 +50,13 @@ if (nativeSrc) {
   }
 }
 
+// Restore better-sqlite3 for Node.js (so `pnpm dev` works after building Electron)
+console.log('[prepare] Restoring better-sqlite3 for Node.js...');
+try {
+  execSync('pnpm rebuild better-sqlite3', { cwd: ROOT, stdio: 'pipe' });
+  console.log('[prepare] Restored native module for Node.js');
+} catch {}
+
 console.log('[prepare] Done!');
 
 function findFile(dir, name) {

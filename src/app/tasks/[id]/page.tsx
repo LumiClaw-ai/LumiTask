@@ -1,18 +1,18 @@
 'use client'
 
-import { useParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
-import { fetchTask } from '@/lib/api'
+import { useParams, useRouter } from 'next/navigation'
 import { TaskDrawer } from '@/components/task/task-drawer'
+import { KanbanBoard } from '@/components/board/kanban-board'
 
 export default function TaskDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const taskId = params.id as string
 
   return (
-    <div className="flex-1 flex items-center justify-center text-zinc-500">
-      <p className="text-sm">加载任务详情...</p>
-      <TaskDrawer taskId={taskId} onClose={() => window.history.back()} />
+    <div className="flex flex-col h-full min-h-0">
+      <KanbanBoard />
+      <TaskDrawer taskId={taskId} onClose={() => router.push('/tasks')} />
     </div>
   )
 }

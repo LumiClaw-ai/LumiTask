@@ -55,6 +55,9 @@ export function KanbanBoard({ dateFrom, dateTo }: KanbanBoardProps) {
       const col = COLUMNS.find(c => (c.statuses as readonly string[]).includes(t.status))
       if (col) map[col.key].push(t)
     }
+    // Running: most recently started first
+    map.running.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0))
+    // Done: most recently completed first
     if (map.done.length > 10) map.done = map.done.slice(0, 10)
     return map
   }, [filtered])

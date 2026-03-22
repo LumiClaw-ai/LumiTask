@@ -7,7 +7,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   'inbox':     ['open'],
   'open':      ['assigned', 'running', 'cancelled'],
   'assigned':  ['open', 'running', 'cancelled'],
-  'running':   ['done', 'failed', 'blocked', 'cancelled'],
+  'running':   ['done', 'failed', 'blocked', 'cancelled', 'open'],
   'blocked':   ['running', 'open', 'cancelled'],
   'done':      ['open'],   // reopen
   'failed':    ['open'],   // retry/reopen

@@ -42,18 +42,16 @@ export async function GET(request: NextRequest) {
     const agentsList = await db.select().from(agents);
     const agentMap = new Map(agentsList.map(a => [a.id, { name: a.name, displayName: a.displayName }]));
 
-    // Get comment/log counts per task
-    const allLogs = await db.select({
+    // Get comment/log counts per task (using SQL aggregation, not full scan)
+    const logCounts = await db.select({
       taskId: activityLog.taskId,
-      action: activityLog.action,
-    }).from(activityLog);
+      comments: sql<number>`sum(case when ${activityLog.action} like 'comment.%' or ${activityLog.action} = 'task.blocked' then 1 else 0 end)`,
+      logs: sql<number>`sum(case when ${activityLog.action} not like 'comment.%' and ${activityLog.action} != 'task.blocked' then 1 else 0 end)`,
+    }).from(activityLog).groupBy(activityLog.taskId);
 
     const countsMap = new Map<string, { comments: number; logs: number }>();
-    for (const log of allLogs) {
-      if (!countsMap.has(log.taskId)) countsMap.set(log.taskId, { comments: 0, logs: 0 });
-      const c = countsMap.get(log.taskId)!;
-      if (log.action.startsWith('comment.') || log.action === 'task.blocked') c.comments++;
-      else c.logs++;
+    for (const row of logCounts) {
+      countsMap.set(row.taskId, { comments: row.comments || 0, logs: row.logs || 0 });
     }
 
     const enriched = result.map(t => {

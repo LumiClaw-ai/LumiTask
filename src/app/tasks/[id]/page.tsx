@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { TaskDrawer } from '@/components/task/task-drawer'
-import { KanbanBoard } from '@/components/board/kanban-board'
 
 export default function TaskDetailPage() {
   const params = useParams()
@@ -10,9 +9,11 @@ export default function TaskDetailPage() {
   const taskId = params.id as string
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <KanbanBoard />
+    <>
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-sm text-zinc-600">任务详情</p>
+      </div>
       <TaskDrawer taskId={taskId} onClose={() => router.push('/tasks')} />
-    </div>
+    </>
   )
 }

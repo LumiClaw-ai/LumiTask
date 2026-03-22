@@ -60,7 +60,9 @@ export async function GET(
       assigneeAgentId: tasks.assigneeAgentId,
     }).from(tasks).where(eq(tasks.parentTaskId, id));
 
-    return NextResponse.json({ ...task, agent, activityLog: logs, artifacts: arts, dependencies, subtasks });
+    // Don't return outputResult in API (internal field for dependency chain)
+    const { outputResult: _omit, ...taskData } = task;
+    return NextResponse.json({ ...taskData, agent, activityLog: logs, artifacts: arts, dependencies, subtasks });
   } catch (error) {
     return NextResponse.json({ error: "Failed to get task" }, { status: 500 });
   }

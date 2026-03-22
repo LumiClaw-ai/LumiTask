@@ -28,7 +28,7 @@ export async function POST(
       taskId: id,
       action: "task.started",
       actorType: "system",
-      message: "Task started",
+      message: "任务开始执行",
       createdAt: now,
     });
 

@@ -68,8 +68,8 @@ export function LogsList({ logs, isRunning }: LogsListProps) {
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto px-3 py-2 font-mono text-[11px]">
-      {logs.length === 0 && (
-        <p className="text-zinc-500 text-center py-8 font-sans text-sm">No logs yet.</p>
+      {logs.length === 0 && !isRunning && (
+        <p className="text-zinc-500 text-center py-8 font-sans text-sm">暂无日志</p>
       )}
       {logs.map((entry, i) => {
         const isLast = i === logs.length - 1
@@ -121,9 +121,12 @@ export function LogsList({ logs, isRunning }: LogsListProps) {
         )
       })}
       {isRunning && (
-        <div className="flex items-center gap-2 py-2 text-purple-400">
-          <span className="inline-block h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
-          <span className="font-sans text-xs">Agent is working...</span>
+        <div className="flex items-center gap-2 py-3 text-purple-400">
+          <svg className="animate-spin h-3.5 w-3.5 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="font-sans text-xs animate-quiet-pulse">智能体执行中...</span>
         </div>
       )}
     </div>

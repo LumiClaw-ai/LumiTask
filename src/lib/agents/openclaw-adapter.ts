@@ -67,7 +67,7 @@ export class OpenClawAdapter implements AgentAdapter {
             const latest = sessions.sort((a, b) => b.updatedAt - a.updatedAt)[0]
             // Only read if session was updated after task started
             if (latest.updatedAt >= taskStartTime - 5000) {
-              const msgs = readSessionTail(agentId, latest.sessionId, 5)
+              const msgs = readSessionTail(agentId, latest.sessionId, 20)
               let hasNew = false
               for (const msg of msgs) {
                 if (!msg.id || seenMsgIds.has(msg.id)) continue

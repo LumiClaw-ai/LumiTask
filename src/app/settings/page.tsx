@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FolderOpen, Bell, CheckCircle, Link2, Wifi } from 'lucide-react'
+import { FolderOpen, Link2, Wifi } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getSettings, updateSettings, fetchAgents } from '@/lib/api'
 import { FolderPicker } from '@/components/task/folder-picker'
@@ -27,21 +27,9 @@ export default function SettingsPage() {
   const [connectionResult, setConnectionResult] = useState<{ success: boolean; error?: string; agents?: any[] } | null>(null)
   const [connectionTesting, setConnectionTesting] = useState(false)
 
-  // Notification channel state
-  const [notifyEnabled, setNotifyEnabled] = useState(false)
-  const [notifyAgentChannel, setNotifyAgentChannel] = useState('') // "agentId:channel:accountId"
-  const [notifyEvents, setNotifyEvents] = useState<string[]>(['task.failed', 'task.blocked'])
-  const [notifyTestResult, setNotifyTestResult] = useState<string | null>(null)
 
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings })
   const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: fetchAgents })
-  const { data: channelData } = useQuery({
-    queryKey: ['notification-channels'],
-    queryFn: async () => {
-      const res = await fetch('/api/notifications/channels')
-      return res.json()
-    },
-  })
 
   useEffect(() => {
     if (settings) {
@@ -58,15 +46,6 @@ export default function SettingsPage() {
     }
   }, [settings])
 
-  // Load notification config from API response
-  useEffect(() => {
-    if (channelData?.config) {
-      const c = channelData.config
-      setNotifyEnabled(c.enabled || false)
-      setNotifyAgentChannel(`${c.agentId}:${c.channel}:${c.accountId}`)
-      setNotifyEvents(c.events || ['task.failed', 'task.blocked'])
-    }
-  }, [channelData])
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -236,7 +215,8 @@ export default function SettingsPage() {
 
           {/* Notifications */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-zinc-300">Notifications</h3>
+            <h3 className="text-sm font-medium text-zinc-300">浏览器通知</h3>
+            <p className="text-xs text-zinc-500">任务完成或失败时在浏览器推送桌面通知</p>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -244,7 +224,7 @@ export default function SettingsPage() {
                 onChange={(e) => setToastNotifications(e.target.checked)}
                 className="accent-blue-500"
               />
-              <span className="text-sm text-zinc-400">In-app toast notifications</span>
+              <span className="text-sm text-zinc-400">应用内 Toast 提示</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -253,8 +233,9 @@ export default function SettingsPage() {
                 onChange={(e) => setBrowserNotifications(e.target.checked)}
                 className="accent-blue-500"
               />
-              <span className="text-sm text-zinc-400">Browser notifications</span>
+              <span className="text-sm text-zinc-400">浏览器桌面通知</span>
             </label>
+            <p className="text-xs text-zinc-600">消息渠道通知（飞书/Discord 等）无需配置，从消息渠道创建的任务完成后会自动通知回来源渠道。</p>
           </div>
 
           {/* Inbox Reminder */}
@@ -285,118 +266,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Agent Channel Notifications */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-1.5">
-              <Bell className="h-4 w-4" /> Agent 频道通知
-            </h3>
-            <p className="text-xs text-zinc-500">通过 Agent 已接入的消息频道（飞书、Discord 等）接收任务通知</p>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifyEnabled}
-                onChange={(e) => setNotifyEnabled(e.target.checked)}
-                className="accent-blue-500"
-              />
-              <span className="text-sm text-zinc-400">启用频道通知</span>
-            </label>
-
-            {notifyEnabled && (
-              <>
-                <div>
-                  <label className={labelClass}>选择通知频道</label>
-                  <select
-                    className={selectClass}
-                    value={notifyAgentChannel}
-                    onChange={(e) => setNotifyAgentChannel(e.target.value)}
-                  >
-                    <option value="">-- 选择 Agent 频道 --</option>
-                    {(channelData?.channels || []).map((ch: any) => (
-                      <option key={`${ch.agentId}:${ch.channel}:${ch.accountId}`} value={`${ch.agentId}:${ch.channel}:${ch.accountId}`}>
-                        {ch.agentName} → {ch.channel} ({ch.accountId})
-                      </option>
-                    ))}
-                  </select>
-                  {(channelData?.channels || []).length === 0 && (
-                    <p className="text-xs text-zinc-600 mt-1">未发现可用频道。请确保 OpenClaw 已配置消息频道。</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className={labelClass}>通知事件</label>
-                  <div className="space-y-1.5">
-                    {[
-                      { id: 'task.completed', label: '任务完成' },
-                      { id: 'task.failed', label: '任务失败' },
-                      { id: 'task.blocked', label: '任务阻塞（需决策）' },
-                      { id: 'task.dependencies_met', label: '依赖就绪' },
-                    ].map(evt => (
-                      <label key={evt.id} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={notifyEvents.includes(evt.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) setNotifyEvents([...notifyEvents, evt.id])
-                            else setNotifyEvents(notifyEvents.filter(e => e !== evt.id))
-                          }}
-                          className="accent-blue-500"
-                        />
-                        <span className="text-sm text-zinc-400">{evt.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {notifyAgentChannel && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setNotifyTestResult(null)
-                      const [agentId, channel, accountId] = notifyAgentChannel.split(':')
-                      const res = await fetch('/api/notifications/test', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          config: { enabled: true, agentId, channel, accountId, events: notifyEvents },
-                        }),
-                      })
-                      const data = await res.json()
-                      setNotifyTestResult(data.success ? 'success' : 'failed')
-                    }}
-                    className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 cursor-pointer"
-                  >
-                    测试发送
-                    {notifyTestResult === 'success' && <CheckCircle className="h-3.5 w-3.5 text-green-400" />}
-                    {notifyTestResult === 'failed' && <span className="text-red-400 text-xs">失败</span>}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-
-          <Button onClick={() => {
-            // Save notification config along with other settings
-            if (notifyEnabled && notifyAgentChannel) {
-              const [agentId, channel, accountId] = notifyAgentChannel.split(':')
-              fetch('/api/notifications/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  config: { enabled: true, agentId, channel, accountId, events: notifyEvents },
-                }),
-              }).catch(() => {})
-            } else if (!notifyEnabled) {
-              fetch('/api/notifications/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  config: { enabled: false, agentId: '', channel: '', accountId: '', events: [] },
-                }),
-              }).catch(() => {})
-            }
-            mutation.mutate()
-          }} disabled={mutation.isPending}>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
             {mutation.isPending ? 'Saving...' : 'Save Settings'}
           </Button>
         </div>

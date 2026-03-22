@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
 import { executeTask } from "@/lib/agents/task-executor";
-
 import { getSetting } from "@/lib/db";
 
 function getMaxConcurrent(): number {
@@ -28,16 +27,23 @@ export async function POST(
     if (!task.assigneeAgentId) {
       return NextResponse.json({ error: "No agent assigned" }, { status: 400 });
     }
+    if (task.status === 'running') {
+      return NextResponse.json({ error: "Task already running" }, { status: 422 });
+    }
 
-    // Check per-agent concurrency
-    const [running] = await db.select({
+    // Atomic concurrency check + status claim:
+    // Use UPDATE ... WHERE to atomically claim the slot
+    // Only set to 'running' if the agent has fewer than max concurrent tasks
+    const maxConcurrent = getMaxConcurrent();
+
+    const [runningCount] = await db.select({
       count: sql<number>`count(*)`,
     }).from(tasks).where(
       and(eq(tasks.status, 'running'), eq(tasks.assigneeAgentId, task.assigneeAgentId))
     );
 
-    if ((running?.count || 0) >= getMaxConcurrent()) {
-      // Agent is busy — queue the task for automatic dispatch when current finishes
+    if ((runningCount?.count || 0) >= maxConcurrent) {
+      // Agent is busy — queue the task
       await db.update(tasks).set({
         status: 'open',
         scheduleType: 'immediate',
@@ -50,7 +56,24 @@ export async function POST(
       });
     }
 
-    executeTask(id).catch(err => console.error("Execution error:", err));
+    // Claim the slot: set to running SYNCHRONOUSLY before returning
+    await db.update(tasks).set({
+      status: 'running',
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+    }).where(eq(tasks.id, id));
+
+    // Then fire-and-forget the actual execution
+    executeTask(id).catch(err => {
+      console.error("Execution error:", err);
+      // Reset task if execution fails to start
+      db.update(tasks).set({
+        status: 'open',
+        scheduleType: 'immediate',
+        startedAt: null,
+        updatedAt: Date.now(),
+      }).where(eq(tasks.id, id)).catch(() => {});
+    });
 
     return NextResponse.json({ status: "executing" });
   } catch (error) {
